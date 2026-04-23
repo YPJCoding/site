@@ -11,10 +11,10 @@ hero:
   actions:
     - theme: brand
       text: 去看笔记
-      link: /notes/macOS/Homebrew
+      link: /software/browser/plugin
     - theme: alt
       text: 打开知识库
-      link: /knowledge-base/sinosure/01
+      link: /knowledge/sinosure/01
 
 features:
   - title: 笔记
