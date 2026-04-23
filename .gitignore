@@ -1,0 +1,40 @@
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+
+# dependencies
+node_modules
+
+# build output
+.vitepress/dist
+dist
+
+# local cache
+.vitepress/cache
+.vite
+.unocss-cache
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# system files
+.DS_Store
+Thumbs.db
+
+# env
+.env
+.env.*
+!.env.example
+
+# editor
+.idea
+.vscode
+
+# temporary files
+*.swp
+*.swo
+*~

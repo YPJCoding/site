@@ -1,0 +1,25 @@
+/*顺滑定位*/
+html {
+  scroll-behavior: smooth;
+}
+
+:root {
+  /*Hero 图加背景光晕*/
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    #bfdbfe 10%,
+    #93c5fd 45%,
+    #c4b5fd 100%
+  );
+  --vp-home-hero-image-filter: blur(64px);
+}
+
+.dark {
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    rgb(96 165 250 / 0.62) 10%,
+    rgb(59 130 246 / 0.56) 45%,
+    rgb(139 92 246 / 0.52) 100%
+  );
+  --vp-home-hero-image-filter: blur(82px);
+}
