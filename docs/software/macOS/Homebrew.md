@@ -1,5 +1,5 @@
 ---
-title: Homebrew（包管理器）
+title: 安装Homebrew（包管理器）
 order: 1
 ---
 
