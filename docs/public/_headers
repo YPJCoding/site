@@ -1,2 +1,7 @@
+# 禁止 Cloudflare Pages 默认域名被收录
 https://site-3t5.pages.dev/*
   X-Robots-Tag: noindex
+
+# 禁止 knowledge 目录被收录
+/knowledge/*
+  X-Robots-Tag: noindex, nofollow
