@@ -13,6 +13,9 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'author', content: 'YPJCoding' }],
     ['meta', { name: 'robots', content: 'index,follow' }],
+
+    // bing seo
+    ['meta', { name: 'msvalidate.01', content: '1317718A168196208B1402D11FB55AFF' }],
   ],
 
   cleanUrls: true,
