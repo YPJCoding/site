@@ -11,6 +11,8 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
+    ['meta', { name: 'author', content: 'YPJCoding' }],
+    ['meta', { name: 'robots', content: 'index,follow' }],
   ],
 
   cleanUrls: true,
@@ -18,6 +20,10 @@ export default defineConfig({
 
   router: {
     prefetchLinks: false
+  },
+
+  sitemap: {
+    hostname: 'https://976511.com'
   },
 
   themeConfig,
