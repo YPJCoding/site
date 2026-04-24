@@ -18,7 +18,7 @@ export default defineConfig({
     ['meta', { name: 'msvalidate.01', content: '1317718A168196208B1402D11FB55AFF' }],
 
     // baidu seo
-    ['meta', { name: 'baidu-site-verification', content: 'codeva-EBJflqGuby' }],
+    ['meta', { name: 'baidu-site-verification', content: 'codeva-1AXVHUYLzH' }],
   ],
 
   cleanUrls: true,
