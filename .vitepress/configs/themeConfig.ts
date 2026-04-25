@@ -1,22 +1,16 @@
 import type { DefaultTheme } from 'vitepress'
-import AutoRoute from './route.script'
-
-const git = {
-  repo: 'https://github.com/YPJCoding/site',
-  branch: 'main',
-  dir: 'docs',
-  mode: 'edit',
-}
+import autoNav from './auto-nav'
+import { GIT_INFO } from './siteMeta'
 
 export default {
   // 导航栏标题左侧 logo
   logo: '/logo.svg',
 
   // 顶栏
-  nav: AutoRoute.nav,
+  nav: autoNav.nav,
 
   // 左侧栏
-  sidebar: AutoRoute.sidebar,
+  sidebar: autoNav.sidebar,
 
   // 本地搜索
   search: {
@@ -26,12 +20,12 @@ export default {
   // 社交链接
   socialLinks: [{
     icon: 'github',
-    link: git.repo,
+    link: GIT_INFO.repo,
   }],
 
   // 编辑
   editLink: {
-    pattern: `${git.repo}/${git.mode}/${git.branch}/${git.dir}/:path`,
+    pattern: `${GIT_INFO.repo}/${GIT_INFO.mode}/${GIT_INFO.branch}/${GIT_INFO.dir}/:path`,
     text: '在 GitHub 上编辑此页'
   },
 

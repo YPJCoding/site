@@ -133,7 +133,7 @@ pnpm docs:preview
 │  ├─ configs/
 │  │  ├─ themeConfig.ts
 │  │  ├─ route.config.ts
-│  │  └─ route.script.ts
+│  │  └─ auto-nav.ts
 │  └─ theme/
 │     ├─ index.ts
 │     └─ index.css
@@ -287,7 +287,7 @@ sitemap: {
 
 ```ts
 import type { DefaultTheme } from 'vitepress'
-import AutoRoute from './route.script'
+import autoNav from './auto-nav'
 
 const git = {
   repo: 'https://github.com/YPJCoding/site',
@@ -299,9 +299,9 @@ const git = {
 export default {
   logo: '/logo.svg',
 
-  nav: AutoRoute.nav,
+  nav: autoNav.nav,
 
-  sidebar: AutoRoute.sidebar,
+  sidebar: autoNav.sidebar,
 
   search: {
     provider: 'local'
@@ -352,15 +352,15 @@ export default {
 ### 1. 使用自动生成的 nav 和 sidebar
 
 ```ts
-nav: AutoRoute.nav,
-sidebar: AutoRoute.sidebar,
+nav: autoNav.nav,
+sidebar: autoNav.sidebar,
 ```
 
 这是这个项目比较核心的设计。
 
 一般 VitePress 项目会手动维护 `nav` 和 `sidebar`，但笔记内容一多，维护成本会变高。
 
-所以这里通过 `route.script.ts` 扫描 `docs` 目录，自动生成顶部导航和左侧侧边栏。
+所以这里通过 `auto-nav.ts` 扫描 `docs` 目录，自动生成顶部导航和左侧侧边栏。
 
 ### 2. 开启本地搜索
 
@@ -593,7 +593,7 @@ export const EXCLUDED_DIRS = new Set(['.vitepress', 'public', 'node_modules'])
 创建：
 
 ```txt
-.vitepress/configs/route.script.ts
+.vitepress/configs/auto-nav.ts
 ```
 
 核心思路是：
@@ -1018,3 +1018,4 @@ sitemap: {
 8. 最终以静态站点形式部署到 Cloudflare Pages。
 
 对于个人知识库来说，这种方案足够轻量，也足够长期维护。后续真正需要投入精力的地方，不是折腾站点功能，而是持续把零散内容整理成值得反复查看的知识体系。
+
