@@ -1,5 +1,12 @@
 ---
 title: 文件默认打开方式
+description: 在 macOS 中按文件类型（UTI）批量指定默认打开应用的做法，使用 duti 修改 Launch Services 关联并快速生效。
+order: 4
+outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: macOS,默认打开方式,duti,UTI,Launch Services,文件关联,批量设置
 ---
 
 # macOS 中设置文件默认打开方式 <Badge type="warning" text="用 duti 按 UTI 批量指定" />

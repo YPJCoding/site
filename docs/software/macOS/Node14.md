@@ -1,5 +1,12 @@
 ---
+title: 安装 Node.js 14（arm64）
+description: macOS arm64 通过 n 安装 Node.js 14 的兼容方案，使用非官方构建镜像并配置必要环境变量。
 order: 3
+outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: Node.js 14,macOS,arm64,n,安装Node14,非官方构建,N_NODE_MIRROR,N_ARCH
 ---
 
 # 安装Node.js 14 <Badge type="warning" text="本教程仅适用于arm64" />

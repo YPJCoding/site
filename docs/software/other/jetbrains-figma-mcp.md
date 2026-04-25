@@ -1,6 +1,12 @@
 ---
+title: JetBrains 配置 Figma MCP
 description: 使用 figma-developer-mcp 将 Figma 接入 JetBrains AI Assistant 的完整配置指南
+order: 2
 outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: JetBrains,AI Assistant,MCP,Figma,figma-developer-mcp,Model Context Protocol,IDE配置
 ---
 
 # JetBrains 配置 Figma MCP

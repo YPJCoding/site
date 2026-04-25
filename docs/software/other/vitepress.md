@@ -1,6 +1,12 @@
 ---
 title: VitePress搭建教程
+description: 使用 VitePress 从零搭建个人知识库站点的完整教程，包含目录结构、导航侧边栏自动生成、主题定制与部署流程。
 order: 1
+outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: VitePress,知识库,文档站点,Markdown,侧边栏自动生成,导航栏,主题定制,Cloudflare Pages,静态部署
 ---
 
 # 使用 VitePress 搭建个人知识库站点

@@ -1,3 +1,14 @@
+---
+title: 关闭输入法气泡提示
+description: 通过修改 FeatureFlags/Domain/UIKit.plist 关闭 macOS 输入法状态气泡（redesigned_text_cursor），并说明命令参数与生效方式。
+order: 6
+outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: macOS,输入法气泡,FeatureFlags,UIKit.plist,defaults write,redesigned_text_cursor,关闭提示
+---
+
 # 关闭输入法气泡提示
 
 在部分 macOS 版本里，切换输入法或输入文字时，光标附近会出现一个输入法状态气泡或悬浮提示。很多人觉得它会遮挡内容、打断视线，而且系统设置里通常找不到直接关闭它的开关。社区里常见的做法，是通过修改 `FeatureFlags` 下的 `UIKit.plist`，把 `redesigned_text_cursor` 这个特性关掉。

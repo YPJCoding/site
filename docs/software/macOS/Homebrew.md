@@ -1,6 +1,12 @@
 ---
 title: 安装Homebrew（包管理器）
+description: macOS arm64 安装 Homebrew 的步骤与前置要求整理，包含 CLT 安装、安装脚本运行方式与常见注意事项。
 order: 1
+outline: deep
+head:
+  - - meta
+    - name: keywords
+      content: Homebrew,macOS,arm64,CLT,Xcode Command Line Tools,包管理器,brew安装
 ---
 
 # 安装Homebrew <Badge type="warning" text="本教程仅适用于arm64" />
