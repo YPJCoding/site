@@ -52,6 +52,14 @@ git --version
 
 推荐使用较新的 Node.js LTS 版本，并使用 pnpm 管理依赖。
 
+当前项目在 `package.json` 中约束了：
+
+```json
+"engines": {
+  "node": ">=20"
+}
+```
+
 ## 三、初始化项目
 
 先创建项目目录：
@@ -79,6 +87,9 @@ pnpm add -D vitepress@2.0.0-alpha.17 @types/node
 ```json
 {
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
@@ -123,7 +134,10 @@ pnpm docs:preview
 ├─ docs/
 │  ├─ index.md
 │  ├─ public/
-│  │  └─ logo.svg
+│  │  ├─ logo.svg
+│  │  ├─ og.svg
+│  │  ├─ robots.txt
+│  │  └─ _headers
 │  ├─ software/
 │  ├─ knowledge/
 │  ├─ interview/
@@ -131,6 +145,8 @@ pnpm docs:preview
 ├─ .vitepress/
 │  ├─ config.ts
 │  ├─ configs/
+│  │  ├─ siteMeta.ts
+│  │  ├─ seo.ts
 │  │  ├─ themeConfig.ts
 │  │  ├─ route.config.ts
 │  │  └─ auto-nav.ts
@@ -155,36 +171,47 @@ pnpm docs:preview
 
 ```ts
 import { defineConfig } from 'vitepress'
+import { buildSeoHead } from './configs/seo'
+import {
+  SEARCH_ENGINE_VERIFICATION,
+  SITE_AUTHOR,
+  SITE_DESCRIPTION,
+  SITE_HOSTNAME,
+  SITE_LANG,
+  SITE_TITLE,
+} from './configs/siteMeta'
 import themeConfig from './configs/themeConfig'
 
 export default defineConfig({
   srcDir: 'docs',
 
-  lang: 'zh-CN',
-  title: 'YPJCoding',
-  description: '个人笔记与知识库，记录前端开发、Vue、React、工程化、面试题与工作中的知识沉淀。',
+  lang: SITE_LANG,
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-    ['meta', { name: 'author', content: 'YPJCoding' }],
+    ['meta', { name: 'author', content: SITE_AUTHOR }],
     ['meta', { name: 'robots', content: 'index,follow' }],
 
     // bing seo
-    ['meta', { name: 'msvalidate.01', content: '这里替换成自己的 Bing 校验码' }],
+    ['meta', { name: 'msvalidate.01', content: SEARCH_ENGINE_VERIFICATION.bing }],
 
     // baidu seo
-    ['meta', { name: 'baidu-site-verification', content: '这里替换成自己的百度校验码' }],
+    ['meta', { name: 'baidu-site-verification', content: SEARCH_ENGINE_VERIFICATION.baidu }],
   ],
 
   cleanUrls: true,
   lastUpdated: true,
 
   router: {
-    prefetchLinks: false
+    prefetchLinks: false,
   },
 
+  transformHead: buildSeoHead,
+
   sitemap: {
-    hostname: 'https://976511.com'
+    hostname: SITE_HOSTNAME,
   },
 
   themeConfig,
@@ -206,12 +233,12 @@ srcDir: 'docs'
 ### 2. lang、title、description
 
 ```ts
-lang: 'zh-CN',
-title: 'YPJCoding',
-description: '个人笔记与知识库...'
+lang: SITE_LANG,
+title: SITE_TITLE,
+description: SITE_DESCRIPTION
 ```
 
-这些是站点的基础信息，也会影响 SEO 和浏览器展示。
+这些是站点的基础信息，也会影响 SEO 和浏览器展示。当前项目把它们统一放在 `.vitepress/configs/siteMeta.ts` 里集中管理。
 
 ### 3. head
 
@@ -269,11 +296,19 @@ lastUpdated: true
 
 ```ts
 sitemap: {
-  hostname: 'https://976511.com'
+  hostname: SITE_HOSTNAME
 }
 ```
 
 配置站点域名后，VitePress 可以生成站点地图，方便搜索引擎收录。
+
+### 7. transformHead（SEO 扩展）
+
+```ts
+transformHead: buildSeoHead
+```
+
+项目里把 canonical、Open Graph、Twitter 卡片和 JSON-LD 结构化数据统一抽到了 `.vitepress/configs/seo.ts`，主配置文件只负责组装，后续维护会更清晰。
 
 ## 六、拆分主题配置
 
@@ -283,18 +318,14 @@ sitemap: {
 .vitepress/configs/themeConfig.ts
 ```
 
+另外，站点常量和 SEO 逻辑可以分别放到 `.vitepress/configs/siteMeta.ts` 与 `.vitepress/configs/seo.ts`，让 `config.ts` 只做聚合。
+
 示例：
 
 ```ts
 import type { DefaultTheme } from 'vitepress'
 import autoNav from './auto-nav'
-
-const git = {
-  repo: 'https://github.com/YPJCoding/site',
-  branch: 'main',
-  dir: 'docs',
-  mode: 'edit',
-}
+import { GIT_INFO } from './siteMeta'
 
 export default {
   logo: '/logo.svg',
@@ -310,12 +341,12 @@ export default {
   socialLinks: [
     {
       icon: 'github',
-      link: git.repo,
+      link: GIT_INFO.repo,
     }
   ],
 
   editLink: {
-    pattern: `${git.repo}/${git.mode}/${git.branch}/${git.dir}/:path`,
+    pattern: `${GIT_INFO.repo}/${GIT_INFO.mode}/${GIT_INFO.branch}/${GIT_INFO.dir}/:path`,
     text: '在 GitHub 上编辑此页'
   },
 
@@ -376,7 +407,7 @@ search: {
 
 ```ts
 editLink: {
-  pattern: `${git.repo}/${git.mode}/${git.branch}/${git.dir}/:path`,
+  pattern: `${GIT_INFO.repo}/${GIT_INFO.mode}/${GIT_INFO.branch}/${GIT_INFO.dir}/:path`,
   text: '在 GitHub 上编辑此页'
 }
 ```
@@ -992,12 +1023,10 @@ NODE_VERSION=20
 
 ### 6. 注意 sitemap 域名
 
-如果站点最终部署到自己的域名，需要确认 `.vitepress/config.ts` 中的 sitemap 域名和实际访问域名一致：
+如果站点最终部署到自己的域名，需要确认 `.vitepress/configs/siteMeta.ts` 中的站点域名和实际访问域名一致（`config.ts` 会读取这个常量）：
 
 ```ts
-sitemap: {
-  hostname: 'https://976511.com'
-}
+export const SITE_HOSTNAME = 'https://976511.com'
 ```
 
 这样生成的站点地图才会使用正确的 URL。
