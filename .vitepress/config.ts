@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress'
 import { buildSeoHead } from './configs/seo'
+import { markdownConfig } from './configs/markdown'
 import {
   SEARCH_ENGINE_VERIFICATION,
   SITE_AUTHOR,
@@ -29,6 +30,10 @@ export default defineConfig({
     // baidu seo
     ['meta', { name: 'baidu-site-verification', content: SEARCH_ENGINE_VERIFICATION.baidu }],
   ],
+
+  markdown: {
+    config: markdownConfig,
+  },
 
   cleanUrls: true,
   lastUpdated: true,

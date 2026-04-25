@@ -15,7 +15,8 @@
     "useDefineForClassFields": true
   },
   "include": [
-    ".vitepress/**/*.ts"
+    ".vitepress/**/*.ts",
+    ".vitepress/**/*.d.ts"
   ],
   "exclude": [
     ".vitepress/dist",
