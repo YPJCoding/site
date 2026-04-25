@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#121B35"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="30%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#4F46E5" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#4F46E5" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="88" y="86" width="1024" height="458" rx="28" fill="#0F172A" fill-opacity="0.72" stroke="#334155" stroke-opacity="0.55"/>
+  </g>
+
+  <g fill="#E2E8F0" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'">
+    <text x="140" y="230" font-size="72" font-weight="800" letter-spacing="-1">YPJCoding</text>
+    <text x="140" y="305" font-size="32" font-weight="600" fill="#A5B4FC">个人笔记与知识库</text>
+    <text x="140" y="372" font-size="26" font-weight="500" fill="#CBD5E1">前端 · 工程化 · 面试 · 工作沉淀</text>
+  </g>
+
+  <g transform="translate(920 160)">
+    <rect x="0" y="0" width="160" height="160" rx="28" fill="#111827" stroke="#4F46E5" stroke-opacity="0.8"/>
+    <path d="M48 52h64v16H64v52H48V52zm64 52h-32V88h32v16z" fill="#A5B4FC"/>
+    <circle cx="128" cy="32" r="6" fill="#4F46E5"/>
+  </g>
+</svg>

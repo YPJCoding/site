@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /knowledge/
 
 Sitemap: https://976511.com/sitemap.xml
