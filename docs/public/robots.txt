@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /knowledge/
 
-Sitemap: https://976511.com/sitemap.xml
+Sitemap: https://976511.xyz/sitemap.xml
