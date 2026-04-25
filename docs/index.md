@@ -1,5 +1,7 @@
 ---
 layout: home
+title: YPJCoding - 前端开发笔记与个人知识库
+titleTemplate: false
 
 hero:
   name: YPJCoding
