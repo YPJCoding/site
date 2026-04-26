@@ -24,6 +24,9 @@ export default defineConfig({
     ['meta', { name: 'author', content: SITE_AUTHOR }],
     ['meta', { name: 'robots', content: 'index,follow' }],
 
+    // google seo
+    ['meta', { name: 'google-site-verification', content: SEARCH_ENGINE_VERIFICATION.google }],
+
     // bing seo
     ['meta', { name: 'msvalidate.01', content: SEARCH_ENGINE_VERIFICATION.bing }],
 
