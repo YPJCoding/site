@@ -1,5 +1,5 @@
 ---
-title: Windows 10 使用 fnm 管理 Node.js 版本
+title: fnm管理Node.js
 description: 记录在 Windows 10 中使用 fnm 管理 Node.js 版本，以及 PowerShell 中启用 fnm 环境的基础配置。
 order: 2
 outline: deep
