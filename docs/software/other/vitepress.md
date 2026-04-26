@@ -1026,7 +1026,7 @@ NODE_VERSION=20
 如果站点最终部署到自己的域名，需要确认 `.vitepress/configs/siteMeta.ts` 中的站点域名和实际访问域名一致（`config.ts` 会读取这个常量）：
 
 ```ts
-export const SITE_HOSTNAME = 'https://976511.xyz'
+export const SITE_HOSTNAME = 'https://site.976511.xyz'
 ```
 
 这样生成的站点地图才会使用正确的 URL。
