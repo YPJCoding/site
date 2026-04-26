@@ -18,5 +18,5 @@ export const GIT_INFO = {
 export const SEARCH_ENGINE_VERIFICATION = {
   google: 'I1TXXU8NYeK_qt8XIMrW4YO4H6jmJcUK9XZ3u7WeNLc',
   bing: '1317718A168196208B1402D11FB55AFF',
-  baidu: 'codeva-1AXVHUYLzH',
+  baidu: 'codeva-QuTr7pkUKX',
 } as const
