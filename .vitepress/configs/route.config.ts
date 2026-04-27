@@ -2,7 +2,7 @@
  * 1) 顶层 nav 顺序：只控制 docs 下一级目录
  * 2) 没配置到的一级目录，会按自然排序追加到后面
  */
-export const NAV_ORDER = ['software', 'knowledge', 'interview', 'about']
+export const NAV_ORDER = ['software', 'frontend', 'knowledge', 'interview', 'about']
 
 
 /**
@@ -19,12 +19,14 @@ export const NAV_ORDER = ['software', 'knowledge', 'interview', 'about']
 export const NAME_MAP: Record<string, string> = {
   // 顶部导航相关
   "software": "软件",
+  "frontend": "前端",
   "knowledge": "知识库",
   "interview": "面试",
   "about": "关于",
 
   // 左侧栏相关
   'browser': '浏览器',
+  'pdf': 'PDF',
   'sinosure': '中国信保',
 
   'focus': '其他',
