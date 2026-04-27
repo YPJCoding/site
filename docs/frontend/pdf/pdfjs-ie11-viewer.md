@@ -1,5 +1,5 @@
 ---
-title: PDF.js 兼容 IE11 的 PDF 预览方案
+title: PDF.js（IE11）
 description: 记录在前端项目中使用 PDF.js 预览 PDF 文件的接入方式，包含 IE11 兼容版本选择、public 静态资源放置、iframe 加载 viewer.html 以及跨域注意事项。
 order: 1
 outline: deep
