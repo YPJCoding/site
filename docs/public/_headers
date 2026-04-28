@@ -1,0 +1,31 @@
+# ===== 安全头（全局） =====
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+
+# ===== HTML 页面（短缓存，方便内容更新） =====
+/*
+  Cache-Control: public, max-age=3600
+  Content-Type: text/html; charset=utf-8
+
+# ===== 带哈希的 JS/CSS 资源（永久缓存） =====
+/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/chunks/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# ===== 图片与字体（长期缓存） =====
+/*.svg
+  Cache-Control: public, max-age=604800
+
+/*.png
+  Cache-Control: public, max-age=604800
+
+/*.ico
+  Cache-Control: public, max-age=604800
