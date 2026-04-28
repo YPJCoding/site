@@ -5,11 +5,6 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
 
-# ===== HTML 页面（短缓存，方便内容更新） =====
-/*
-  Cache-Control: public, max-age=3600
-  Content-Type: text/html; charset=utf-8
-
 # ===== 带哈希的 JS/CSS 资源（永久缓存） =====
 /assets/*.js
   Cache-Control: public, max-age=31536000, immutable

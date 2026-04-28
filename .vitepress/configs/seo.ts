@@ -182,7 +182,7 @@ export function buildSeoHead(ctx: TransformContext): HeadConfig[] {
     ['link', { rel: 'canonical', href: canonicalUrl }],
     ...buildOgTags(ctx, canonicalUrl, ogImage),
   ]
-  console.log('isHomePage', isHomePage)
+
   // 首页：WebSite + Person + Article（英雄页也可用 Article 描述） + BreadcrumbList
   if (isHomePage) {
     heads.push(
