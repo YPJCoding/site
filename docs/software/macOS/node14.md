@@ -1,7 +1,7 @@
 ---
 title: 安装 Node.js 14（arm64）
 description: macOS arm64 通过 n 安装 Node.js 14 的兼容方案，使用非官方构建镜像并配置必要环境变量。
-order: 3
+order: 4
 outline: deep
 head:
   - - meta

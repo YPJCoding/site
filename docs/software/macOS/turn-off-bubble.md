@@ -1,7 +1,7 @@
 ---
 title: 关闭输入法气泡提示
 description: 通过修改 FeatureFlags/Domain/UIKit.plist 关闭 macOS 输入法状态气泡（redesigned_text_cursor），并说明命令参数与生效方式。
-order: 6
+order: 7
 outline: deep
 head:
   - - meta

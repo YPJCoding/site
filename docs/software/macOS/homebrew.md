@@ -1,7 +1,7 @@
 ---
 title: 安装Homebrew
 description: 记录 Apple Silicon 设备上安装 Homebrew 的过程，包括 CLT 安装、Homebrew 安装、环境变量配置和验证命令。
-order: 1
+order: 2
 outline: deep
 head:
   - - meta

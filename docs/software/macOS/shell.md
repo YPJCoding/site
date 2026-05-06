@@ -1,7 +1,7 @@
 ---
 title: Shell 提示符简化显示
 description: macOS 终端（zsh）精简提示符与登录提示：隐藏用户名/主机名、简化 PROMPT，并用 .hushlogin 去掉 Last login 提示。
-order: 5
+order: 6
 outline: deep
 head:
   - - meta

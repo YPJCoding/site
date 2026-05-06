@@ -1,7 +1,7 @@
 ---
 title: 安装Aria2（下载器）
 description: macOS arm64 使用 Homebrew 安装 aria2 的步骤，包含 aria2c 路径确认与基础使用准备。
-order: 2
+order: 3
 outline: deep
 head:
   - - meta

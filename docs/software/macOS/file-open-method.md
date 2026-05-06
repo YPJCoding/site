@@ -1,7 +1,7 @@
 ---
 title: 文件默认打开方式
 description: 在 macOS 中按文件类型（UTI）批量指定默认打开应用的做法，使用 duti 修改 Launch Services 关联并快速生效。
-order: 4
+order: 5
 outline: deep
 head:
   - - meta
