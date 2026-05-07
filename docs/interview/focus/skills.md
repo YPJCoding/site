@@ -1,5 +1,7 @@
 # 求职自查版
 
+> 来源：[Bilibili - BV1NFQzB7EVm](https://www.bilibili.com/video/BV1NFQzB7EVm)
+
 ## 一、先让 HR 愿意点开你
 1. 头像用真人照，最好是职业照
    - 数据：89% HR 认为真人头像更容易让他们点开简历
