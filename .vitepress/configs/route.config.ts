@@ -32,6 +32,7 @@ export const NAME_MAP: Record<string, string> = {
   'cleaning': '清洁维护',
 
   'focus': '其他',
+  'resume': '简历',
 
   'install': '安装教程'
 
