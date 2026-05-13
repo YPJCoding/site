@@ -135,15 +135,15 @@ chmod +x convert.sh
 
 ### 参数解析
 
-| 参数 | 说明 |
-|------|------|
+| 参数                       | 说明                                      |
+|--------------------------|-----------------------------------------|
 | `-c:v hevc_videotoolbox` | 使用 macOS VideoToolbox 硬件编码器，速度快且不占用 CPU |
-| `-q:v 65` | 视频质量参数，范围 1-100，65 是画质与体积的平衡点 |
-| `-tag:v hvc1` | 标记为 hvc1 确保 macOS QuickTime 和 iOS 可直接播放 |
-| `-c:a copy` | 音频流直接复制不重新编码 |
-| `-vf scale` | 若高度超过 1080 则等比缩放到 1080p，否则保持原尺寸 |
-| `-vf fps` | 若帧率超过 30fps 则限制为 30fps，否则保持原始帧率 |
-| `-movflags +faststart` | 将 moov atom 移到文件头部，便于网络流式播放 |
+| `-q:v 65`                | 视频质量参数，范围 1-100，65 是画质与体积的平衡点           |
+| `-tag:v hvc1`            | 标记为 hvc1 确保 macOS QuickTime 和 iOS 可直接播放 |
+| `-c:a copy`              | 音频流直接复制不重新编码                            |
+| `-vf scale`              | 若高度超过 1080 则等比缩放到 1080p，否则保持原尺寸         |
+| `-vf fps`                | 若帧率超过 30fps 则限制为 30fps，否则保持原始帧率         |
+| `-movflags +faststart`   | 将 moov atom 移到文件头部，便于网络流式播放             |
 
 ### 效果
 

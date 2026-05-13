@@ -15,6 +15,21 @@ outline: deep
 
 ## 浏览器
 
+### ungoogled-chromium
+
+- 官网：[ungoogled-software/ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium)
+- 类型：开源浏览器
+- 用途：基于 Chromium，但移除了所有 Google 相关服务和依赖，注重隐私保护。
+
+ungoogled-chromium 是 Chromium 的去 Google 化社区构建版本，主要特点：
+
+- **剥离 Google 服务**：移除 Google Host Detector、Google URL Tracker、Google Cloud Messaging 等组件。
+- **隐私增强**：默认禁用 WebRTC、超音频监听、搜索推荐、预测服务等潜在隐私风险功能。
+- **无电话回家**：去除了所有向 Google 服务器自动发送请求的行为。
+- **手动更新**：不内置自动更新机制，由用户自行决定何时升级。
+
+如果日常主要依赖 Chrome 系生态，但又希望在浏览器层面减少数据收集，可以考虑用它作为补充浏览器。不过由于剥离了大量集成服务，部分依赖 Google API 的网页功能可能受限。
+
 <!-- 后续记录 Chrome、Edge、Firefox、Arc 等 -->
 
 ## 开发者工具
