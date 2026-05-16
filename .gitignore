@@ -39,9 +39,11 @@ Thumbs.db
 *.swo
 *~
 
-
+# Notion generated docs: keep only the hand-written home page and public assets.
 docs/*
-!docs/public/*
 !docs/index.md
+!docs/public/
+!docs/public/**
 
+# Notion generated VitePress routes
 .vitepress/generated/notion-routes.ts
