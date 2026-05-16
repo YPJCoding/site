@@ -38,3 +38,10 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+
+docs/*
+!docs/public/*
+!docs/index.md
+
+.vitepress/generated/notion-routes.ts
