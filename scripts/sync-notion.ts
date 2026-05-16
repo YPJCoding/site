@@ -11,16 +11,19 @@ const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
 const ARTICLE_HASH_LENGTH = 8
 const ARTICLE_HASH_MAX_LENGTH = 16
 const RESERVED_DOCS_ENTRIES = new Set(['index.md', 'public'])
+const ENV_FILES = ['.env', '.env.local']
 
-const notionToken = process.env.NOTION_TOKEN
+await loadLocalEnvFiles()
+
+const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
 
 if (!notionToken) {
-  throw new Error('Missing required environment variable: NOTION_TOKEN')
+  throw new Error('Missing required environment variable: NOTION_TOKEN. You can set it in .env or .env.local.')
 }
 
 if (!notionRootPageId) {
-  throw new Error('Missing required environment variable: NOTION_ROOT_PAGE_ID')
+  throw new Error('Missing required environment variable: NOTION_ROOT_PAGE_ID. You can set it in .env or .env.local.')
 }
 
 const notion = new Client({
@@ -78,6 +81,56 @@ type NotionBlock = {
 }
 
 const usedArticleLinks = new Set<string>()
+
+async function loadLocalEnvFiles(): Promise<void> {
+  for (const fileName of ENV_FILES) {
+    const envFile = path.resolve(fileName)
+    let content: string
+
+    try {
+      content = await fs.readFile(envFile, 'utf8')
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOENT') continue
+      throw error
+    }
+
+    parseEnvFile(content)
+  }
+}
+
+function parseEnvFile(content: string): void {
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+
+    if (!line || line.startsWith('#')) continue
+
+    const equalIndex = line.indexOf('=')
+    if (equalIndex === -1) continue
+
+    const key = line.slice(0, equalIndex).trim()
+    const rawValue = line.slice(equalIndex + 1).trim()
+
+    if (!key || process.env[key] !== undefined) continue
+
+    process.env[key] = unquoteEnvValue(rawValue)
+  }
+}
+
+function unquoteEnvValue(value: string): string {
+  const quote = value[0]
+  const shouldUnquote =
+    value.length >= 2 &&
+    (quote === '"' || quote === "'") &&
+    value.at(-1) === quote
+
+  if (!shouldUnquote) return value
+
+  return value.slice(1, -1)
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
+}
 
 function indexToCode(index: number): string {
   if (!Number.isInteger(index) || index < 0) {
