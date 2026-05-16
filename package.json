@@ -8,8 +8,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "docs:dev": "vitepress dev",
-    "docs:build": "vitepress build",
+    "notion:sync": "tsx scripts/sync-notion.ts",
+    "docs:dev": "pnpm notion:sync && vitepress dev",
+    "docs:build": "pnpm notion:sync && vitepress build",
     "docs:preview": "vitepress preview"
   },
   "keywords": [],
@@ -17,9 +18,12 @@
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {
+    "@notionhq/client": "latest",
     "@types/node": "^25.6.0",
     "@types/pako": "^2.0.4",
+    "notion-to-md": "latest",
     "pako": "^2.1.0",
+    "tsx": "latest",
     "vitepress": "2.0.0-alpha.17"
   }
 }
