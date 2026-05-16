@@ -1,5 +1,5 @@
 import type { DefaultTheme } from 'vitepress'
-import autoNav from './auto-nav'
+import { nav, sidebar } from '../generated/notion-routes'
 import { GIT_INFO } from './siteMeta'
 
 export default {
@@ -7,10 +7,10 @@ export default {
   logo: '/logo.svg',
 
   // 顶栏
-  nav: autoNav.nav,
+  nav,
 
   // 左侧栏
-  sidebar: autoNav.sidebar,
+  sidebar,
 
   // 本地搜索
   search: {
@@ -22,12 +22,6 @@ export default {
     icon: 'github',
     link: GIT_INFO.repo,
   }],
-
-  // 编辑
-  editLink: {
-    pattern: `${GIT_INFO.repo}/${GIT_INFO.mode}/${GIT_INFO.branch}/${GIT_INFO.dir}/:path`,
-    text: '在 GitHub 上编辑此页'
-  },
 
   // 右侧页面导航的显示等级
   outline: {
