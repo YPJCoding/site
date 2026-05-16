@@ -3,7 +3,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { Client } from '@notionhq/client'
+import dotenv from 'dotenv'
 import { NotionToMarkdown } from 'notion-to-md'
+
+dotenv.config({ path: '.env' })
+dotenv.config({ path: '.env.local' })
 
 const DOCS_DIR = path.resolve('docs')
 const GENERATED_DIR = path.resolve('.vitepress/generated')
@@ -11,9 +15,6 @@ const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
 const ARTICLE_HASH_LENGTH = 8
 const ARTICLE_HASH_MAX_LENGTH = 16
 const RESERVED_DOCS_ENTRIES = new Set(['index.md', 'public'])
-const ENV_FILES = ['.env', '.env.local']
-
-await loadLocalEnvFiles()
 
 const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
@@ -81,56 +82,6 @@ type NotionBlock = {
 }
 
 const usedArticleLinks = new Set<string>()
-
-async function loadLocalEnvFiles(): Promise<void> {
-  for (const fileName of ENV_FILES) {
-    const envFile = path.resolve(fileName)
-    let content: string
-
-    try {
-      content = await fs.readFile(envFile, 'utf8')
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') continue
-      throw error
-    }
-
-    parseEnvFile(content)
-  }
-}
-
-function parseEnvFile(content: string): void {
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim()
-
-    if (!line || line.startsWith('#')) continue
-
-    const equalIndex = line.indexOf('=')
-    if (equalIndex === -1) continue
-
-    const key = line.slice(0, equalIndex).trim()
-    const rawValue = line.slice(equalIndex + 1).trim()
-
-    if (!key || process.env[key] !== undefined) continue
-
-    process.env[key] = unquoteEnvValue(rawValue)
-  }
-}
-
-function unquoteEnvValue(value: string): string {
-  const quote = value[0]
-  const shouldUnquote =
-    value.length >= 2 &&
-    (quote === '"' || quote === "'") &&
-    value.at(-1) === quote
-
-  if (!shouldUnquote) return value
-
-  return value.slice(1, -1)
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && 'code' in error
-}
 
 function indexToCode(index: number): string {
   if (!Number.isInteger(index) || index < 0) {
