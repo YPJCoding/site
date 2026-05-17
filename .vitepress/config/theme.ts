@@ -30,6 +30,11 @@ export default {
     label: '页面导航',
   },
 
+  // 最后更新时间
+  lastUpdated: {
+    text: '最后更新于',
+  },
+
   // 自定义出现在上一页和下一页链接上方的文本
   docFooter: {
     prev: '上一页',
