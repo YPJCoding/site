@@ -108,6 +108,13 @@ type DownloadedImage = {
   filePath: string
 }
 
+type ImageRewriteResult = {
+  markdown: string
+  markdownImageCount: number
+  htmlImageCount: number
+  downloadedImageCount: number
+}
+
 const usedArticleLinks = new Set<string>()
 
 function indexToCode(index: number): string {
@@ -128,6 +135,10 @@ function indexToCode(index: number): string {
 
 function normalizePageId(pageId: string): string {
   return pageId.replaceAll('-', '')
+}
+
+function shortPageId(pageId: string): string {
+  return normalizePageId(pageId).slice(0, 8)
 }
 
 function hashPageId(pageId: string, length: number): string {
@@ -191,6 +202,10 @@ function withArticleFrontmatter(markdown: string, lastUpdated?: string): string 
   return `---\nlastUpdated: ${lastUpdated}\n---\n\n${markdown}`
 }
 
+function elapsedMs(startedAt: number): string {
+  return `${(performance.now() - startedAt).toFixed(3)}ms`
+}
+
 async function cleanDocsDir(): Promise<void> {
   await fs.mkdir(DOCS_DIR, { recursive: true })
 
@@ -217,10 +232,14 @@ async function cleanNotionAssetsDir(): Promise<void> {
 }
 
 async function listChildPages(blockId: string): Promise<ChildPage[]> {
+  const startedAt = performance.now()
   const results: ChildPage[] = []
+  let requestCount = 0
   let startCursor: string | undefined
 
   do {
+    requestCount += 1
+
     const response = await notion.blocks.children.list({
       block_id: blockId,
       page_size: 100,
@@ -241,6 +260,10 @@ async function listChildPages(blockId: string): Promise<ChildPage[]> {
     startCursor = response.has_more ? response.next_cursor ?? undefined : undefined
   } while (startCursor)
 
+  console.info(
+    `[notion-sync] list child pages ${shortPageId(blockId)}: ${results.length} page(s), ${requestCount} request(s), ${elapsedMs(startedAt)}`
+  )
+
   return results
 }
 
@@ -250,6 +273,8 @@ async function buildRouteTree(rootPageId: string): Promise<RouteNode[]> {
     (page) => normalizePageId(page.id) !== homePageId
   )
   const nodes: RouteNode[] = []
+
+  console.info(`[notion-sync] root nav pages: ${navPages.length}`)
 
   for (let index = 0; index < navPages.length; index++) {
     const navPage = navPages[index]
@@ -371,20 +396,38 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
   const timerLabel = `[notion-sync] article "${node.title}"`
   console.time(timerLabel)
 
+  console.time(`[notion-sync] article "${node.title}" fetch notion`)
   const [page, markdownBlocks] = await Promise.all([
     notion.pages.retrieve({ page_id: node.id }),
     n2m.pageToMarkdown(node.id),
   ])
+  console.timeEnd(`[notion-sync] article "${node.title}" fetch notion`)
+
   const pageMeta = page as NotionPageMeta
+
+  console.time(`[notion-sync] article "${node.title}" stringify markdown`)
   const markdownResult = n2m.toMarkdownString(markdownBlocks) as { parent?: string } | string
   const markdown = typeof markdownResult === 'string' ? markdownResult : markdownResult.parent ?? ''
+  console.timeEnd(`[notion-sync] article "${node.title}" stringify markdown`)
+
+  console.time(`[notion-sync] article "${node.title}" rewrite notion links`)
   const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
-  const assetMarkdown = await rewriteNotionImageLinks(linkedMarkdown, node)
-  const content = withArticleFrontmatter(normalizeMarkdown(assetMarkdown, node.title), pageMeta.last_edited_time)
+  console.timeEnd(`[notion-sync] article "${node.title}" rewrite notion links`)
+
+  console.time(`[notion-sync] article "${node.title}" rewrite images`)
+  const imageRewriteResult = await rewriteNotionImageLinks(linkedMarkdown, node)
+  console.timeEnd(`[notion-sync] article "${node.title}" rewrite images`)
+  console.info(
+    `[notion-sync] article "${node.title}" images: ${imageRewriteResult.downloadedImageCount} downloaded, ${imageRewriteResult.markdownImageCount} markdown image(s), ${imageRewriteResult.htmlImageCount} html image(s)`
+  )
+
+  console.time(`[notion-sync] article "${node.title}" write file`)
+  const content = withArticleFrontmatter(normalizeMarkdown(imageRewriteResult.markdown, node.title), pageMeta.last_edited_time)
   const targetFile = toMarkdownFile(node.linkParts)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
+  console.timeEnd(`[notion-sync] article "${node.title}" write file`)
 
   console.timeEnd(timerLabel)
   console.info(`[notion-sync] Synced article "${node.title}" -> ${node.link}`)
@@ -397,8 +440,9 @@ function rewriteNotionPageLinks(markdown: string, routeLinkMap: Map<string, stri
   })
 }
 
-async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promise<string> {
+async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promise<ImageRewriteResult> {
   let result = markdown
+  let downloadedImageCount = 0
   const markdownImageMatches = [...markdown.matchAll(MARKDOWN_IMAGE_RE)]
 
   for (const match of markdownImageMatches) {
@@ -407,6 +451,7 @@ async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promi
 
     if (!downloaded) continue
 
+    downloadedImageCount += 1
     result = result.replace(imageMarkdown, `![${alt}](${downloaded.publicPath})`)
   }
 
@@ -418,14 +463,22 @@ async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promi
 
     if (!downloaded) continue
 
+    downloadedImageCount += 1
     result = result.replace(imageHtml, `<img${beforeSrc}src="${downloaded.publicPath}"${afterSrc}>`)
   }
 
-  return result
+  return {
+    markdown: result,
+    markdownImageCount: markdownImageMatches.length,
+    htmlImageCount: htmlImageMatches.length,
+    downloadedImageCount,
+  }
 }
 
 async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): Promise<DownloadedImage | undefined> {
   if (!shouldDownloadImage(imageUrl)) return undefined
+
+  const startedAt = performance.now()
 
   try {
     const response = await fetch(imageUrl)
@@ -451,6 +504,8 @@ async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): P
 
     await fs.mkdir(pageAssetsDir, { recursive: true })
     await fs.writeFile(filePath, Buffer.from(arrayBuffer))
+
+    console.info(`[notion-sync] Downloaded image for "${node.title}" -> ${publicPath} (${elapsedMs(startedAt)})`)
 
     return {
       publicPath,
