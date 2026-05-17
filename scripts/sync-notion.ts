@@ -368,6 +368,9 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
     throw new Error(`Missing article path for Notion page: ${node.id}`)
   }
 
+  const timerLabel = `[notion-sync] article "${node.title}"`
+  console.time(timerLabel)
+
   const [page, markdownBlocks] = await Promise.all([
     notion.pages.retrieve({ page_id: node.id }),
     n2m.pageToMarkdown(node.id),
@@ -383,6 +386,7 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
 
+  console.timeEnd(timerLabel)
   console.info(`[notion-sync] Synced article "${node.title}" -> ${node.link}`)
 }
 
@@ -680,17 +684,35 @@ async function writeRoutesFile(nodes: RouteNode[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  console.time('[notion-sync] total')
+
+  console.time('[notion-sync] clean docs')
   await cleanDocsDir()
   await cleanNotionAssetsDir()
+  console.timeEnd('[notion-sync] clean docs')
 
+  console.time('[notion-sync] build route tree')
   const routeTree = await buildRouteTree(notionRootPageId!)
-  const routeLinkMap = buildRouteLinkMap(routeTree)
+  console.timeEnd('[notion-sync] build route tree')
 
+  console.time('[notion-sync] build route link map')
+  const routeLinkMap = buildRouteLinkMap(routeTree)
+  console.timeEnd('[notion-sync] build route link map')
+
+  console.time('[notion-sync] write articles')
   await writeArticles(routeTree, routeLinkMap)
+  console.timeEnd('[notion-sync] write articles')
+
+  console.time('[notion-sync] write routes')
   await writeRoutesFile(routeTree)
+  console.timeEnd('[notion-sync] write routes')
+
+  console.time('[notion-sync] write home')
   await writeHomePage(routeTree)
+  console.timeEnd('[notion-sync] write home')
 
   console.info(`[notion-sync] Synced ${usedArticleLinks.size} article page(s) from Notion.`)
+  console.timeEnd('[notion-sync] total')
 }
 
 await main()
