@@ -94,6 +94,10 @@ type NotionBlock = {
   }
 }
 
+type NotionPageMeta = {
+  last_edited_time?: string
+}
+
 type HomeFrontmatter = Record<string, unknown> & {
   hero?: {
     actions?: Array<Record<string, unknown>>
@@ -180,6 +184,12 @@ function normalizeMarkdown(markdown: string, title: string): string {
   }
 
   return `# ${title}\n\n${content}\n`
+}
+
+function withArticleFrontmatter(markdown: string, lastUpdated?: string): string {
+  if (!lastUpdated) return markdown
+
+  return `---\nlastUpdated: ${lastUpdated}\n---\n\n${markdown}`
 }
 
 async function cleanDocsDir(): Promise<void> {
@@ -359,12 +369,16 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
     throw new Error(`Missing article path for Notion page: ${node.id}`)
   }
 
-  const markdownBlocks = await n2m.pageToMarkdown(node.id)
+  const [page, markdownBlocks] = await Promise.all([
+    notion.pages.retrieve({ page_id: node.id }),
+    n2m.pageToMarkdown(node.id),
+  ])
+  const pageMeta = page as NotionPageMeta
   const markdownResult = n2m.toMarkdownString(markdownBlocks) as { parent?: string } | string
   const markdown = typeof markdownResult === 'string' ? markdownResult : markdownResult.parent ?? ''
   const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
   const assetMarkdown = await rewriteNotionImageLinks(linkedMarkdown, node)
-  const content = normalizeMarkdown(assetMarkdown, node.title)
+  const content = withArticleFrontmatter(normalizeMarkdown(assetMarkdown, node.title), pageMeta.last_edited_time)
   const targetFile = toMarkdownFile(node.linkParts)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
