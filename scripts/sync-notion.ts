@@ -439,7 +439,7 @@ function toSidebarItem(node: RouteNode): SidebarItem | undefined {
 
   return {
     text: node.title,
-    collapsed: true,
+    collapsed: false,
     items,
   }
 }
