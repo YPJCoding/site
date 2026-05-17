@@ -372,25 +372,42 @@ function resolveHomeActionLinks(frontmatter: HomeFrontmatter, nodes: RouteNode[]
 
   if (!Array.isArray(actions)) return
 
-  const navLinkMap = new Map<string, string>()
-
-  for (const node of nodes) {
-    const link = findFirstArticleLink(node)
-    if (link) navLinkMap.set(normalizePageId(node.id), link)
-  }
+  const routeLinkMap = buildRouteLinkMap(nodes)
 
   for (const action of actions) {
-    const navPageId = action.nav
-    if (typeof navPageId !== 'string') continue
+    const targetPageId = action.nav
+    if (typeof targetPageId !== 'string') continue
 
-    const link = navLinkMap.get(normalizePageId(navPageId))
+    const link = routeLinkMap.get(normalizePageId(targetPageId))
     if (!link) {
-      throw new Error(`Unable to resolve home action nav page id: ${navPageId}`)
+      throw new Error(`Unable to resolve home action page id: ${targetPageId}`)
     }
 
     action.link = link
     delete action.nav
   }
+}
+
+function buildRouteLinkMap(nodes: RouteNode[]): Map<string, string> {
+  const routeLinkMap = new Map<string, string>()
+
+  function visit(node: RouteNode): void {
+    const link = findFirstArticleLink(node)
+
+    if (link) {
+      routeLinkMap.set(normalizePageId(node.id), link)
+    }
+
+    for (const child of node.children) {
+      visit(child)
+    }
+  }
+
+  for (const node of nodes) {
+    visit(node)
+  }
+
+  return routeLinkMap
 }
 
 function findFirstArticleLink(node: RouteNode): string | undefined {
