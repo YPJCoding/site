@@ -8,7 +8,6 @@ import { NotionToMarkdown } from 'notion-to-md'
 import YAML from 'yaml'
 
 dotenv.config({ path: '.env' })
-dotenv.config({ path: '.env.local' })
 
 const DOCS_DIR = path.resolve('docs')
 const GENERATED_DIR = path.resolve('.vitepress/generated')
@@ -28,15 +27,15 @@ const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
 const notionHomePageId = process.env.NOTION_HOME_PAGE_ID
 
 if (!notionToken) {
-  throw new Error('Missing required environment variable: NOTION_TOKEN. You can set it in .env or .env.local.')
+  throw new Error('Missing required environment variable: NOTION_TOKEN. You can set it in .env.')
 }
 
 if (!notionRootPageId) {
-  throw new Error('Missing required environment variable: NOTION_ROOT_PAGE_ID. You can set it in .env or .env.local.')
+  throw new Error('Missing required environment variable: NOTION_ROOT_PAGE_ID. You can set it in .env.')
 }
 
 if (!notionHomePageId) {
-  throw new Error('Missing required environment variable: NOTION_HOME_PAGE_ID. You can set it in .env or .env.local.')
+  throw new Error('Missing required environment variable: NOTION_HOME_PAGE_ID. You can set it in .env.')
 }
 
 const notion = new Client({
@@ -365,7 +364,7 @@ async function writeArticles(nodes: RouteNode[], routeLinkMap: Map<string, strin
 }
 
 async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>): Promise<void> {
-  if (!node.linkParts) {
+  if (!node.linkParts || !node.link) {
     throw new Error(`Missing article path for Notion page: ${node.id}`)
   }
 
@@ -383,6 +382,8 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
+
+  console.info(`[notion-sync] Synced article "${node.title}" -> ${node.link}`)
 }
 
 function rewriteNotionPageLinks(markdown: string, routeLinkMap: Map<string, string>): string {
@@ -682,7 +683,7 @@ async function main(): Promise<void> {
   await cleanDocsDir()
   await cleanNotionAssetsDir()
 
-  const routeTree = await buildRouteTree(notionRootPageId)
+  const routeTree = await buildRouteTree(notionRootPageId!)
   const routeLinkMap = buildRouteLinkMap(routeTree)
 
   await writeArticles(routeTree, routeLinkMap)
