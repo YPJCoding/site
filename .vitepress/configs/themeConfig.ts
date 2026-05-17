@@ -36,15 +36,6 @@ export default {
     next: '下一页',
   },
 
-  // 允许自定义上次更新的文本和日期格式。
-  lastUpdated: {
-    text: '最后更新于',
-    formatOptions: {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    },
-  },
-
   // 是否在 markdown 中的外部链接旁显示外部链接图标
   externalLinkIcon: true,
 
