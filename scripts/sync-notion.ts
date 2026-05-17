@@ -5,6 +5,7 @@ import process from 'node:process'
 import { Client } from '@notionhq/client'
 import dotenv from 'dotenv'
 import { NotionToMarkdown } from 'notion-to-md'
+import YAML from 'yaml'
 
 dotenv.config({ path: '.env' })
 dotenv.config({ path: '.env.local' })
@@ -12,12 +13,14 @@ dotenv.config({ path: '.env.local' })
 const DOCS_DIR = path.resolve('docs')
 const GENERATED_DIR = path.resolve('.vitepress/generated')
 const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
+const HOME_FILE = path.join(DOCS_DIR, 'index.md')
 const ARTICLE_HASH_LENGTH = 8
 const ARTICLE_HASH_MAX_LENGTH = 16
-const RESERVED_DOCS_ENTRIES = new Set(['index.md', 'public'])
+const RESERVED_DOCS_ENTRIES = new Set(['public'])
 
 const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
+const notionHomePageId = process.env.NOTION_HOME_PAGE_ID
 
 if (!notionToken) {
   throw new Error('Missing required environment variable: NOTION_TOKEN. You can set it in .env or .env.local.')
@@ -25,6 +28,10 @@ if (!notionToken) {
 
 if (!notionRootPageId) {
   throw new Error('Missing required environment variable: NOTION_ROOT_PAGE_ID. You can set it in .env or .env.local.')
+}
+
+if (!notionHomePageId) {
+  throw new Error('Missing required environment variable: NOTION_HOME_PAGE_ID. You can set it in .env or .env.local.')
 }
 
 const notion = new Client({
@@ -78,6 +85,12 @@ type NotionBlock = {
   type?: string
   child_page?: {
     title?: string
+  }
+}
+
+type HomeFrontmatter = Record<string, unknown> & {
+  hero?: {
+    actions?: Array<Record<string, unknown>>
   }
 }
 
@@ -204,7 +217,10 @@ async function listChildPages(blockId: string): Promise<ChildPage[]> {
 }
 
 async function buildRouteTree(rootPageId: string): Promise<RouteNode[]> {
-  const navPages = await listChildPages(rootPageId)
+  const homePageId = normalizePageId(notionHomePageId!)
+  const navPages = (await listChildPages(rootPageId)).filter(
+    (page) => normalizePageId(page.id) !== homePageId
+  )
   const nodes: RouteNode[] = []
 
   for (let index = 0; index < navPages.length; index++) {
@@ -329,6 +345,54 @@ async function writeArticle(pageId: string, title: string, linkParts: string[]):
   await fs.writeFile(targetFile, content, 'utf8')
 }
 
+async function writeHomePage(nodes: RouteNode[]): Promise<void> {
+  const markdownBlocks = await n2m.pageToMarkdown(notionHomePageId!)
+  const markdownResult = n2m.toMarkdownString(markdownBlocks) as { parent?: string } | string
+  const markdown = typeof markdownResult === 'string' ? markdownResult : markdownResult.parent ?? ''
+  const yamlContent = extractFirstYamlCodeBlock(markdown)
+  const frontmatter = YAML.parse(yamlContent) as HomeFrontmatter
+
+  resolveHomeActionLinks(frontmatter, nodes)
+
+  await fs.writeFile(HOME_FILE, `---\n${YAML.stringify(frontmatter)}---\n`, 'utf8')
+}
+
+function extractFirstYamlCodeBlock(markdown: string): string {
+  const match = markdown.match(/```ya?ml\s*\n([\s\S]*?)\n```/i)
+
+  if (!match?.[1]?.trim()) {
+    throw new Error('The Notion home page must contain one yaml code block.')
+  }
+
+  return match[1]
+}
+
+function resolveHomeActionLinks(frontmatter: HomeFrontmatter, nodes: RouteNode[]): void {
+  const actions = frontmatter.hero?.actions
+
+  if (!Array.isArray(actions)) return
+
+  const navLinkMap = new Map<string, string>()
+
+  for (const node of nodes) {
+    const link = findFirstArticleLink(node)
+    if (link) navLinkMap.set(normalizePageId(node.id), link)
+  }
+
+  for (const action of actions) {
+    const navPageId = action.nav
+    if (typeof navPageId !== 'string') continue
+
+    const link = navLinkMap.get(normalizePageId(navPageId))
+    if (!link) {
+      throw new Error(`Unable to resolve home action nav page id: ${navPageId}`)
+    }
+
+    action.link = link
+    delete action.nav
+  }
+}
+
 function findFirstArticleLink(node: RouteNode): string | undefined {
   if (node.link) return node.link
 
@@ -438,6 +502,7 @@ async function main(): Promise<void> {
   await cleanDocsDir()
   const routeTree = await buildRouteTree(notionRootPageId)
   await writeRoutesFile(routeTree)
+  await writeHomePage(routeTree)
 
   console.info(`[notion-sync] Synced ${usedArticleLinks.size} article page(s) from Notion.`)
 }
