@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitepress'
-import { markdownConfig } from './configs/markdown'
+import { markdownConfig } from './config/markdown'
 import {
   SEARCH_ENGINE_VERIFICATION,
   SITE_DESCRIPTION,
   SITE_HOSTNAME,
   SITE_LANG,
   SITE_TITLE,
-} from './configs/siteMeta'
-import themeConfig from './configs/themeConfig'
+} from './config/site'
+import themeConfig from './config/theme'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
