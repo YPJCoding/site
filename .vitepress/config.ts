@@ -37,7 +37,7 @@ export default defineConfig({
   },
 
   cleanUrls: true,
-  lastUpdated: false,
+  lastUpdated: true,
 
   router: {
     prefetchLinks: false,
