@@ -17,6 +17,7 @@ const HOME_FILE = path.join(DOCS_DIR, 'index.md')
 const ARTICLE_HASH_LENGTH = 8
 const ARTICLE_HASH_MAX_LENGTH = 16
 const RESERVED_DOCS_ENTRIES = new Set(['public'])
+const NOTION_PAGE_URL_RE = /https:\/\/www\.notion\.so\/(?:[^\s)\]"'<>`]+\/)?[^\s)\]"'<>`]*?([0-9a-fA-F]{32})(?:[?#][^\s)\]"'<>`]*)?/g
 
 const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
@@ -64,6 +65,7 @@ type RouteNode = {
   code?: string
   hash?: string
   link?: string
+  linkParts?: string[]
   children: RouteNode[]
 }
 
@@ -242,21 +244,7 @@ async function buildNode(
   const childPages = await listChildPages(page.id)
 
   if (childPages.length === 0) {
-    const hash = createArticleHash(page.id, pathParts)
-    const linkParts = [...pathParts, hash]
-    const link = toLink(linkParts)
-
-    await writeArticle(page.id, page.title, linkParts)
-
-    return {
-      id: page.id,
-      title: page.title,
-      type,
-      code,
-      hash,
-      link,
-      children: [],
-    }
+    return buildKnownArticleNode(page, pathParts, type, code)
   }
 
   const children: RouteNode[] = []
@@ -273,7 +261,7 @@ async function buildNode(
       continue
     }
 
-    const childNode = await buildKnownArticleNode(childPage, pathParts)
+    const childNode = buildKnownArticleNode(childPage, pathParts)
     children.push(childNode)
   }
 
@@ -305,7 +293,7 @@ async function buildKnownGroupNode(
       continue
     }
 
-    children.push(await buildKnownArticleNode(childPage, pathParts))
+    children.push(buildKnownArticleNode(childPage, pathParts))
   }
 
   return {
@@ -317,32 +305,58 @@ async function buildKnownGroupNode(
   }
 }
 
-async function buildKnownArticleNode(page: ChildPage, pathParts: string[]): Promise<RouteNode> {
+function buildKnownArticleNode(
+  page: ChildPage,
+  pathParts: string[],
+  type: RouteNodeType = 'article',
+  code?: string
+): RouteNode {
   const hash = createArticleHash(page.id, pathParts)
   const linkParts = [...pathParts, hash]
   const link = toLink(linkParts)
 
-  await writeArticle(page.id, page.title, linkParts)
-
   return {
     id: page.id,
     title: page.title,
-    type: 'article',
+    type,
+    code,
     hash,
     link,
+    linkParts,
     children: [],
   }
 }
 
-async function writeArticle(pageId: string, title: string, linkParts: string[]): Promise<void> {
-  const markdownBlocks = await n2m.pageToMarkdown(pageId)
+async function writeArticles(nodes: RouteNode[], routeLinkMap: Map<string, string>): Promise<void> {
+  for (const node of nodes) {
+    if (node.type === 'article' || (node.type === 'nav' && node.linkParts)) {
+      await writeArticle(node, routeLinkMap)
+    }
+
+    await writeArticles(node.children, routeLinkMap)
+  }
+}
+
+async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>): Promise<void> {
+  if (!node.linkParts) {
+    throw new Error(`Missing article path for Notion page: ${node.id}`)
+  }
+
+  const markdownBlocks = await n2m.pageToMarkdown(node.id)
   const markdownResult = n2m.toMarkdownString(markdownBlocks) as { parent?: string } | string
   const markdown = typeof markdownResult === 'string' ? markdownResult : markdownResult.parent ?? ''
-  const content = normalizeMarkdown(markdown, title)
-  const targetFile = toMarkdownFile(linkParts)
+  const content = normalizeMarkdown(rewriteNotionPageLinks(markdown, routeLinkMap), node.title)
+  const targetFile = toMarkdownFile(node.linkParts)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
+}
+
+function rewriteNotionPageLinks(markdown: string, routeLinkMap: Map<string, string>): string {
+  return markdown.replace(NOTION_PAGE_URL_RE, (url, rawPageId: string) => {
+    const link = routeLinkMap.get(normalizePageId(rawPageId))
+    return link ?? url
+  })
 }
 
 async function writeHomePage(nodes: RouteNode[]): Promise<void> {
@@ -518,6 +532,9 @@ async function writeRoutesFile(nodes: RouteNode[]): Promise<void> {
 async function main(): Promise<void> {
   await cleanDocsDir()
   const routeTree = await buildRouteTree(notionRootPageId)
+  const routeLinkMap = buildRouteLinkMap(routeTree)
+
+  await writeArticles(routeTree, routeLinkMap)
   await writeRoutesFile(routeTree)
   await writeHomePage(routeTree)
 
