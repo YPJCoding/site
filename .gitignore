@@ -39,9 +39,8 @@ Thumbs.db
 *.swo
 *~
 
-# Notion generated docs: keep only the hand-written home page and public assets.
+# Notion generated docs: keep only public assets in Git.
 docs/*
-!docs/index.md
 !docs/public/
 !docs/public/**
 
