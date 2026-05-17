@@ -14,10 +14,14 @@ const DOCS_DIR = path.resolve('docs')
 const GENERATED_DIR = path.resolve('.vitepress/generated')
 const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
 const HOME_FILE = path.join(DOCS_DIR, 'index.md')
+const NOTION_ASSETS_DIR = path.join(DOCS_DIR, 'public/notion-assets')
+const NOTION_ASSETS_PUBLIC_BASE = '/notion-assets'
 const ARTICLE_HASH_LENGTH = 8
 const ARTICLE_HASH_MAX_LENGTH = 16
 const RESERVED_DOCS_ENTRIES = new Set(['public'])
 const NOTION_PAGE_URL_RE = /https:\/\/www\.notion\.so\/(?:[^\s)\]"'<>`]+\/)?[^\s)\]"'<>`]*?([0-9a-fA-F]{32})(?:[?#][^\s)\]"'<>`]*)?/g
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g
+const HTML_IMAGE_RE = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*)>/g
 
 const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionRootPageId = process.env.NOTION_ROOT_PAGE_ID
@@ -94,6 +98,11 @@ type HomeFrontmatter = Record<string, unknown> & {
   hero?: {
     actions?: Array<Record<string, unknown>>
   }
+}
+
+type DownloadedImage = {
+  publicPath: string
+  filePath: string
 }
 
 const usedArticleLinks = new Set<string>()
@@ -188,6 +197,14 @@ async function cleanDocsDir(): Promise<void> {
       })
     })
   )
+}
+
+async function cleanNotionAssetsDir(): Promise<void> {
+  await fs.rm(NOTION_ASSETS_DIR, {
+    recursive: true,
+    force: true,
+  })
+  await fs.mkdir(NOTION_ASSETS_DIR, { recursive: true })
 }
 
 async function listChildPages(blockId: string): Promise<ChildPage[]> {
@@ -345,7 +362,9 @@ async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>):
   const markdownBlocks = await n2m.pageToMarkdown(node.id)
   const markdownResult = n2m.toMarkdownString(markdownBlocks) as { parent?: string } | string
   const markdown = typeof markdownResult === 'string' ? markdownResult : markdownResult.parent ?? ''
-  const content = normalizeMarkdown(rewriteNotionPageLinks(markdown, routeLinkMap), node.title)
+  const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
+  const assetMarkdown = await rewriteNotionImageLinks(linkedMarkdown, node)
+  const content = normalizeMarkdown(assetMarkdown, node.title)
   const targetFile = toMarkdownFile(node.linkParts)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
@@ -357,6 +376,122 @@ function rewriteNotionPageLinks(markdown: string, routeLinkMap: Map<string, stri
     const link = routeLinkMap.get(normalizePageId(rawPageId))
     return link ?? url
   })
+}
+
+async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promise<string> {
+  let result = markdown
+  const markdownImageMatches = [...markdown.matchAll(MARKDOWN_IMAGE_RE)]
+
+  for (const match of markdownImageMatches) {
+    const [imageMarkdown, alt, imageUrl] = match
+    const downloaded = await downloadNotionImageIfNeeded(imageUrl, node)
+
+    if (!downloaded) continue
+
+    result = result.replace(imageMarkdown, `![${alt}](${downloaded.publicPath})`)
+  }
+
+  const htmlImageMatches = [...result.matchAll(HTML_IMAGE_RE)]
+
+  for (const match of htmlImageMatches) {
+    const [imageHtml, beforeSrc, imageUrl, afterSrc] = match
+    const downloaded = await downloadNotionImageIfNeeded(imageUrl, node)
+
+    if (!downloaded) continue
+
+    result = result.replace(imageHtml, `<img${beforeSrc}src="${downloaded.publicPath}"${afterSrc}>`)
+  }
+
+  return result
+}
+
+async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): Promise<DownloadedImage | undefined> {
+  if (!shouldDownloadImage(imageUrl)) return undefined
+
+  try {
+    const response = await fetch(imageUrl)
+
+    if (!response.ok) {
+      console.warn(`[notion-sync] Failed to download image in "${node.title}": ${response.status} ${imageUrl}`)
+      return undefined
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    const extension = getImageExtension(imageUrl, contentType)
+    const imageHash = crypto
+      .createHash('sha256')
+      .update(`${normalizePageId(node.id)}:${imageUrl}`)
+      .digest('base64url')
+      .slice(0, 12)
+      .toLowerCase()
+    const pageAssetsDir = path.join(NOTION_ASSETS_DIR, normalizePageId(node.id))
+    const fileName = `${imageHash}${extension}`
+    const filePath = path.join(pageAssetsDir, fileName)
+    const publicPath = `${NOTION_ASSETS_PUBLIC_BASE}/${normalizePageId(node.id)}/${fileName}`
+    const arrayBuffer = await response.arrayBuffer()
+
+    await fs.mkdir(pageAssetsDir, { recursive: true })
+    await fs.writeFile(filePath, Buffer.from(arrayBuffer))
+
+    return {
+      publicPath,
+      filePath,
+    }
+  } catch (error) {
+    console.warn(`[notion-sync] Failed to download image in "${node.title}": ${imageUrl}`)
+    if (error instanceof Error) {
+      console.warn(`[notion-sync] ${error.message}`)
+    }
+
+    return undefined
+  }
+}
+
+function shouldDownloadImage(imageUrl: string): boolean {
+  try {
+    const url = new URL(imageUrl)
+    const hostname = url.hostname.toLowerCase()
+
+    return hostname.includes('notion.so')
+      || hostname.includes('notion-static.com')
+      || hostname.includes('notionusercontent.com')
+      || hostname.includes('prod-files-secure')
+      || hostname.includes('s3.us-west-2.amazonaws.com')
+  } catch {
+    return false
+  }
+}
+
+function getImageExtension(imageUrl: string, contentType: string): string {
+  const urlExtension = getImageExtensionFromUrl(imageUrl)
+  if (urlExtension) return urlExtension
+
+  const normalizedContentType = contentType.split(';')[0]?.trim().toLowerCase()
+  const contentTypeMap: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'image/avif': '.avif',
+  }
+
+  return contentTypeMap[normalizedContentType] ?? '.png'
+}
+
+function getImageExtensionFromUrl(imageUrl: string): string | undefined {
+  try {
+    const url = new URL(imageUrl)
+    const extension = path.extname(url.pathname).toLowerCase()
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'])
+
+    if (allowedExtensions.has(extension)) return extension
+  } catch {
+    return undefined
+  }
+
+  return undefined
 }
 
 async function writeHomePage(nodes: RouteNode[]): Promise<void> {
@@ -531,6 +666,8 @@ async function writeRoutesFile(nodes: RouteNode[]): Promise<void> {
 
 async function main(): Promise<void> {
   await cleanDocsDir()
+  await cleanNotionAssetsDir()
+
   const routeTree = await buildRouteTree(notionRootPageId)
   const routeLinkMap = buildRouteLinkMap(routeTree)
 
