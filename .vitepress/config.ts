@@ -1,9 +1,7 @@
 import { defineConfig } from 'vitepress'
-import { buildSeoHead } from './configs/seo'
 import { markdownConfig } from './configs/markdown'
 import {
   SEARCH_ENGINE_VERIFICATION,
-  SITE_AUTHOR,
   SITE_DESCRIPTION,
   SITE_HOSTNAME,
   SITE_LANG,
@@ -21,7 +19,6 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-    ['meta', { name: 'author', content: SITE_AUTHOR }],
     ['meta', { name: 'robots', content: 'index,follow' }],
 
     // google seo
@@ -44,8 +41,6 @@ export default defineConfig({
   router: {
     prefetchLinks: false,
   },
-
-  transformHead: buildSeoHead,
 
   sitemap: {
     hostname: SITE_HOSTNAME,
