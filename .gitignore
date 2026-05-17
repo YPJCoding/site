@@ -43,6 +43,7 @@ Thumbs.db
 docs/*
 !docs/public/
 !docs/public/**
+docs/public/notion-assets/
 
 # Notion generated VitePress routes
 .vitepress/generated/notion-routes.ts
