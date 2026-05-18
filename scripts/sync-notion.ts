@@ -276,84 +276,42 @@ async function buildRouteTree(rootPageId: string): Promise<RouteNode[]> {
 
   console.info(`[notion-sync] root nav pages: ${navPages.length}`)
 
-  for (let index = 0; index < navPages.length; index++) {
-    const navPage = navPages[index]
-    const navCode = indexToCode(index)
-    const node = await buildNode(navPage, 'nav', [navCode], navCode)
-    nodes.push(node)
+  for (let navIndex = 0; navIndex < navPages.length; navIndex++) {
+    const navPage = navPages[navIndex]
+    const navCode = indexToCode(navIndex)
+    const groupPages = await listChildPages(navPage.id)
+    const groups: RouteNode[] = []
+
+    console.info(`[notion-sync] nav "${navPage.title}" groups: ${groupPages.length}`)
+
+    for (let groupIndex = 0; groupIndex < groupPages.length; groupIndex++) {
+      const groupPage = groupPages[groupIndex]
+      const groupCode = indexToCode(groupIndex)
+      const articlePages = await listChildPages(groupPage.id)
+      const articlePathParts = [navCode, groupCode]
+      const articles = articlePages.map((articlePage) => buildKnownArticleNode(articlePage, articlePathParts))
+
+      console.info(`[notion-sync] group "${groupPage.title}" articles: ${articlePages.length}`)
+
+      groups.push({
+        id: groupPage.id,
+        title: groupPage.title,
+        type: 'group',
+        code: groupCode,
+        children: articles,
+      })
+    }
+
+    nodes.push({
+      id: navPage.id,
+      title: navPage.title,
+      type: 'nav',
+      code: navCode,
+      children: groups,
+    })
   }
 
   return nodes
-}
-
-async function buildNode(
-  page: ChildPage,
-  type: RouteNodeType,
-  pathParts: string[],
-  code?: string
-): Promise<RouteNode> {
-  const childPages = await listChildPages(page.id)
-
-  if (childPages.length === 0) {
-    return buildKnownArticleNode(page, pathParts, type, code)
-  }
-
-  const children: RouteNode[] = []
-  let groupIndex = 0
-
-  for (const childPage of childPages) {
-    const nestedChildPages = await listChildPages(childPage.id)
-
-    if (nestedChildPages.length > 0) {
-      const childCode = indexToCode(groupIndex)
-      groupIndex += 1
-      const childNode = await buildKnownGroupNode(childPage, nestedChildPages, [...pathParts, childCode], childCode)
-      children.push(childNode)
-      continue
-    }
-
-    const childNode = buildKnownArticleNode(childPage, pathParts)
-    children.push(childNode)
-  }
-
-  return {
-    id: page.id,
-    title: page.title,
-    type,
-    code,
-    children,
-  }
-}
-
-async function buildKnownGroupNode(
-  page: ChildPage,
-  childPages: ChildPage[],
-  pathParts: string[],
-  code: string
-): Promise<RouteNode> {
-  const children: RouteNode[] = []
-  let groupIndex = 0
-
-  for (const childPage of childPages) {
-    const nestedChildPages = await listChildPages(childPage.id)
-
-    if (nestedChildPages.length > 0) {
-      const childCode = indexToCode(groupIndex)
-      groupIndex += 1
-      children.push(await buildKnownGroupNode(childPage, nestedChildPages, [...pathParts, childCode], childCode))
-      continue
-    }
-
-    children.push(buildKnownArticleNode(childPage, pathParts))
-  }
-
-  return {
-    id: page.id,
-    title: page.title,
-    type: 'group',
-    code,
-    children,
-  }
 }
 
 function buildKnownArticleNode(
@@ -380,7 +338,7 @@ function buildKnownArticleNode(
 
 async function writeArticles(nodes: RouteNode[], routeLinkMap: Map<string, string>): Promise<void> {
   for (const node of nodes) {
-    if (node.type === 'article' || (node.type === 'nav' && node.linkParts)) {
+    if (node.type === 'article') {
       await writeArticle(node, routeLinkMap)
     }
 
