@@ -24,6 +24,7 @@ const SYNC_CACHE_VERSION = 1
 const NOTION_PAGE_URL_RE = /https:\/\/www\.notion\.so\/(?:[^\s)\]"'<>`]+\/)?[^\s)\]"'<>`]*?([0-9a-fA-F]{32})(?:[?#][^\s)\]"'<>`]*)?/g
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g
 const HTML_IMAGE_RE = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*)>/g
+const LOCAL_NOTION_ASSET_RE = /\/notion-assets\/[^\s)"'<>]+/g
 
 const CONTENT_TYPE = {
   home: 'Home',
@@ -589,7 +590,28 @@ async function canReuseArticle(
   if (cached.outputFile !== expected.outputFile) return false
   if (cached.lastEditedTime !== expected.lastEditedTime) return false
 
-  return fileExists(getArticleOutputFile(article))
+  const articleFile = getArticleOutputFile(article)
+
+  if (!(await fileExists(articleFile))) return false
+
+  return articleLocalAssetsExist(articleFile)
+}
+
+async function articleLocalAssetsExist(articleFile: string): Promise<boolean> {
+  const markdown = await fs.readFile(articleFile, 'utf8')
+  const assetPaths = [...new Set([...markdown.matchAll(LOCAL_NOTION_ASSET_RE)].map((match) => match[0]))]
+
+  for (const assetPath of assetPaths) {
+    if (!(await fileExists(toLocalPublicFilePath(assetPath)))) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function toLocalPublicFilePath(publicPath: string): string {
+  return path.join(DOCS_DIR, 'public', publicPath.replace(/^\/+/, ''))
 }
 
 async function readSyncCache(): Promise<SyncCache | undefined> {
@@ -701,7 +723,7 @@ async function writeArticles(
       return getCachedArticle(article)
     }
 
-  return writeArticle(article, routeLinkMap)
+    return writeArticle(article, routeLinkMap)
   })
 
   return Object.fromEntries(cachedArticles.map((article) => [article.id, article]))
@@ -846,7 +868,7 @@ function shouldDownloadImage(imageUrl: string): boolean {
   try {
     const url = new URL(imageUrl)
     const hostname = url.hostname.toLowerCase()
-    
+
     return hostname.includes('notion.so')
       || hostname.includes('notion-static.com')
       || hostname.includes('notionusercontent.com')
@@ -912,7 +934,7 @@ function buildRouteLinkMap(navItems: RouteNode[], home: ContentRow): Map<string,
   function visit(node: RouteNode): void {
     const link = findFirstArticleLink(node)
 
-  if (link) {
+    if (link) {
       routeLinkMap.set(normalizePageId(node.id), link)
     }
 
