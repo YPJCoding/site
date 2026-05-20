@@ -11,12 +11,15 @@ dotenv.config({ path: '.env' })
 
 const DOCS_DIR = path.resolve('docs')
 const GENERATED_DIR = path.resolve('.vitepress/generated')
+const CACHE_DIR = path.resolve('.vitepress/cache')
 const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
+const SYNC_CACHE_FILE = path.join(CACHE_DIR, 'notion-sync.json')
 const HOME_FILE = path.join(DOCS_DIR, 'index.md')
 const NOTION_ASSETS_DIR = path.join(DOCS_DIR, 'public/notion-assets')
 const NOTION_ASSETS_PUBLIC_BASE = '/notion-assets'
 const RESERVED_DOCS_ENTRIES = new Set(['public'])
 const DEFAULT_ARTICLE_CONCURRENCY = 2
+const SYNC_CACHE_VERSION = 1
 
 const NOTION_PAGE_URL_RE = /https:\/\/www\.notion\.so\/(?:[^\s)\]"'<>`]+\/)?[^\s)\]"'<>`]*?([0-9a-fA-F]{32})(?:[?#][^\s)\]"'<>`]*)?/g
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g
@@ -151,6 +154,21 @@ type ImageRewriteResult = {
   markdown: string
 }
 
+type SyncCache = {
+  version: number
+  routeSignature: string
+  articles: Record<string, CachedArticle>
+}
+
+type CachedArticle = {
+  id: string
+  title: string
+  link: string
+  linkParts: string[]
+  lastEditedTime?: string
+  outputFile: string
+}
+
 function normalizeNotionId(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   if (!trimmed) return undefined
@@ -170,6 +188,10 @@ function readPositiveInteger(value: string | undefined, fallback: number): numbe
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
+function hashText(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex')
+}
+
 function toLink(parts: string[]): string {
   return `/${parts.join('/')}`
 }
@@ -178,6 +200,14 @@ function toMarkdownFile(parts: string[]): string {
   const fileName = `${parts.at(-1)}.md`
   const dirParts = parts.slice(0, -1)
   return path.join(DOCS_DIR, ...dirParts, fileName)
+}
+
+function toProjectRelativePath(filePath: string): string {
+  return path.relative(process.cwd(), filePath).split(path.sep).join('/')
+}
+
+function fromProjectRelativePath(filePath: string): string {
+  return path.resolve(filePath)
 }
 
 function escapeTsString(value: string): string {
@@ -277,7 +307,7 @@ function parseContentRow(value: unknown): ContentRow {
 }
 
 async function queryContentRows(): Promise<ContentRow[]> {
-  const pages: unknown[] = []
+  const rows: ContentRow[] = []
   let startCursor: string | undefined
 
   do {
@@ -287,11 +317,11 @@ async function queryContentRows(): Promise<ContentRow[]> {
       ...(startCursor ? { start_cursor: startCursor } : {}),
     })
 
-    pages.push(...response.results)
+    rows.push(...response.results.map(parseContentRow))
     startCursor = response.has_more ? response.next_cursor ?? undefined : undefined
   } while (startCursor)
 
-  return pages.map(parseContentRow)
+  return rows
 }
 
 function buildSiteModel(rows: ContentRow[]): SiteModel {
@@ -489,6 +519,147 @@ function collectArticles(nodes: RouteNode[]): ArticleTask[] {
   return articles
 }
 
+function createRouteSignature(rows: ContentRow[], navItems: RouteNode[]): string {
+  const routeRecords: Array<Record<string, unknown>> = []
+
+  function visit(node: RouteNode, parentLink?: string): void {
+    routeRecords.push({
+      id: normalizePageId(node.id),
+      type: node.type,
+      slug: node.slug,
+      link: node.link,
+      parentLink,
+    })
+
+    for (const child of node.children) {
+      visit(child, node.link ?? parentLink)
+    }
+  }
+
+  for (const item of navItems) visit(item)
+
+  const rowRecords = rows
+    .map((row) => ({
+      id: normalizePageId(row.id),
+      type: row.type,
+      slug: row.slug ?? '',
+      order: row.order ?? null,
+      parentId: row.parentId ?? '',
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+  return hashText(JSON.stringify({ rows: rowRecords, routes: routeRecords }))
+}
+
+function getArticleOutputFile(article: ArticleTask): string {
+  return toMarkdownFile(article.linkParts)
+}
+
+function getCachedArticle(article: ArticleTask): CachedArticle {
+  return {
+    id: normalizePageId(article.id),
+    title: article.title,
+    link: article.link,
+    linkParts: article.linkParts,
+    lastEditedTime: article.lastEditedTime,
+    outputFile: toProjectRelativePath(getArticleOutputFile(article)),
+  }
+}
+
+async function canReuseArticle(
+  article: ArticleTask,
+  oldCache: SyncCache | undefined,
+  routeSignature: string
+): Promise<boolean> {
+  if (!oldCache) return false
+  if (oldCache.version !== SYNC_CACHE_VERSION) return false
+  if (oldCache.routeSignature !== routeSignature) return false
+
+  const cached = oldCache.articles[normalizePageId(article.id)]
+  const expected = getCachedArticle(article)
+
+  if (!cached) return false
+  if (cached.title !== expected.title) return false
+  if (cached.link !== expected.link) return false
+  if (cached.outputFile !== expected.outputFile) return false
+  if (cached.lastEditedTime !== expected.lastEditedTime) return false
+
+  return fileExists(getArticleOutputFile(article))
+}
+
+async function readSyncCache(): Promise<SyncCache | undefined> {
+  try {
+    const content = await fs.readFile(SYNC_CACHE_FILE, 'utf8')
+    const parsed = JSON.parse(content) as SyncCache
+
+    if (!isRecord(parsed) || typeof parsed.version !== 'number' || typeof parsed.routeSignature !== 'string' || !isRecord(parsed.articles)) {
+      console.warn('[notion-sync] Ignored invalid sync cache.')
+      return undefined
+    }
+
+    return parsed
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
+async function writeSyncCache(cache: SyncCache): Promise<void> {
+  await fs.mkdir(CACHE_DIR, { recursive: true })
+  await fs.writeFile(SYNC_CACHE_FILE, `${JSON.stringify(cache, null, 2)}\n`, 'utf8')
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath)
+    return true
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') return false
+    throw error
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error
+}
+
+async function prepareGeneratedDocs(oldCache: SyncCache | undefined, articles: ArticleTask[]): Promise<void> {
+  await fs.mkdir(DOCS_DIR, { recursive: true })
+  await fs.mkdir(NOTION_ASSETS_DIR, { recursive: true })
+
+  if (!oldCache) {
+    await cleanGeneratedArticleDocs()
+    return
+  }
+
+  const currentFiles = new Set(articles.map((article) => toProjectRelativePath(getArticleOutputFile(article))))
+
+  await Promise.all(
+    Object.values(oldCache.articles).map(async (article) => {
+      if (currentFiles.has(article.outputFile)) return
+
+      await fs.rm(fromProjectRelativePath(article.outputFile), {
+        force: true,
+      })
+    })
+  )
+}
+
+async function cleanGeneratedArticleDocs(): Promise<void> {
+  const entries = await fs.readdir(DOCS_DIR, { withFileTypes: true })
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (RESERVED_DOCS_ENTRIES.has(entry.name)) return
+
+      await fs.rm(path.join(DOCS_DIR, entry.name), {
+        recursive: true,
+        force: true,
+      })
+    })
+  )
+}
+
 function hasH1(markdown: string): boolean {
   return /^#\s+.+$/m.test(markdown)
 }
@@ -513,59 +684,55 @@ function withArticleFrontmatter(markdown: string, lastUpdated?: string): string 
   return `---\nlastUpdated: ${lastUpdated}\n---\n\n${markdown}`
 }
 
-async function cleanGeneratedDocs(): Promise<void> {
-  await fs.mkdir(DOCS_DIR, { recursive: true })
+async function writeArticles(
+  articles: ArticleTask[],
+  routeLinkMap: Map<string, string>,
+  oldCache: SyncCache | undefined,
+  routeSignature: string
+): Promise<Record<string, CachedArticle>> {
+  const cachedArticles = await mapWithConcurrency(articles, articleConcurrency, async (article) => {
+    if (await canReuseArticle(article, oldCache, routeSignature)) {
+      console.info(`[notion-sync] Reused article "${article.title}" -> ${article.link}`)
+      return getCachedArticle(article)
+    }
 
-  const entries = await fs.readdir(DOCS_DIR, { withFileTypes: true })
-
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (RESERVED_DOCS_ENTRIES.has(entry.name)) return
-
-      await fs.rm(path.join(DOCS_DIR, entry.name), {
-        recursive: true,
-        force: true,
-      })
-    })
-  )
-
-  await fs.rm(NOTION_ASSETS_DIR, {
-    recursive: true,
-    force: true,
+    return writeArticle(article, routeLinkMap)
   })
-  await fs.mkdir(NOTION_ASSETS_DIR, { recursive: true })
+
+  return Object.fromEntries(cachedArticles.map((article) => [article.id, article]))
 }
 
-async function writeArticles(articles: ArticleTask[], routeLinkMap: Map<string, string>): Promise<void> {
-  await mapWithConcurrency(articles, articleConcurrency, (article) => writeArticle(article, routeLinkMap))
-}
-
-async function mapWithConcurrency<T>(items: T[], concurrency: number, task: (item: T) => Promise<void>): Promise<void> {
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
   let nextIndex = 0
 
   async function worker(): Promise<void> {
     while (nextIndex < items.length) {
-      const item = items[nextIndex]
+      const currentIndex = nextIndex
       nextIndex += 1
-      await task(item)
+      results[currentIndex] = await task(items[currentIndex] as T)
     }
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+
+  return results
 }
 
-async function writeArticle(article: ArticleTask, routeLinkMap: Map<string, string>): Promise<void> {
+async function writeArticle(article: ArticleTask, routeLinkMap: Map<string, string>): Promise<CachedArticle> {
   const markdownBlocks = await n2m.pageToMarkdown(article.id)
   const markdown = toMarkdownString(markdownBlocks)
   const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
   const imageRewriteResult = await rewriteNotionImageLinks(linkedMarkdown, article)
   const content = withArticleFrontmatter(normalizeMarkdown(imageRewriteResult.markdown, article.title), article.lastEditedTime)
-  const targetFile = toMarkdownFile(article.linkParts)
+  const targetFile = getArticleOutputFile(article)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
 
   console.info(`[notion-sync] Synced article "${article.title}" -> ${article.link}`)
+
+  return getCachedArticle(article)
 }
 
 function toMarkdownString(markdownBlocks: unknown): string {
@@ -844,16 +1011,24 @@ async function writeRoutesFile(navItems: RouteNode[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  await cleanGeneratedDocs()
-
   const rows = await queryContentRows()
   const site = buildSiteModel(rows)
   const articles = collectArticles(site.navItems)
+  const oldCache = await readSyncCache()
+  const routeSignature = createRouteSignature(rows, site.navItems)
   const routeLinkMap = buildRouteLinkMap(site.navItems, site.home)
 
-  await writeArticles(articles, routeLinkMap)
+  await prepareGeneratedDocs(oldCache, articles)
+
+  const cachedArticles = await writeArticles(articles, routeLinkMap, oldCache, routeSignature)
+
   await writeRoutesFile(site.navItems)
   await writeHomePage(site.home)
+  await writeSyncCache({
+    version: SYNC_CACHE_VERSION,
+    routeSignature,
+    articles: cachedArticles,
+  })
 
   console.info(`[notion-sync] Synced ${site.articleCount} article page(s) from Notion.`)
 }
