@@ -1,5 +1,5 @@
 import type { Client } from '@notionhq/client'
-import type { CONTENT_TYPE } from './constants'
+import { CONTENT_TYPE } from './constants'
 
 export type ContentType = typeof CONTENT_TYPE[keyof typeof CONTENT_TYPE]
 export type RouteNodeType = 'nav' | 'group' | 'article'
