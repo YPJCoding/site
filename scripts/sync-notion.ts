@@ -140,11 +140,7 @@ type NavItem = {
   activeMatch: string
 }
 
-type HomeFrontmatter = Record<string, unknown> & {
-  hero?: {
-    actions?: Array<Record<string, unknown>>
-  }
-}
+type HomeFrontmatter = Record<string, unknown>
 
 type DownloadedImage = {
   publicPath: string
@@ -702,13 +698,11 @@ function getImageExtensionFromUrl(imageUrl: string): string | undefined {
   return undefined
 }
 
-async function writeHomePage(home: ContentRow, routeLinkMap: Map<string, string>): Promise<void> {
+async function writeHomePage(home: ContentRow): Promise<void> {
   const markdownBlocks = await n2m.pageToMarkdown(home.id)
   const markdown = toMarkdownString(markdownBlocks)
   const yamlContent = extractFirstYamlCodeBlock(markdown)
   const frontmatter = YAML.parse(yamlContent) as HomeFrontmatter
-
-  resolveHomeActionLinks(frontmatter, routeLinkMap)
 
   await fs.writeFile(HOME_FILE, `---\n${YAML.stringify(frontmatter)}---\n`, 'utf8')
 }
@@ -721,25 +715,6 @@ function extractFirstYamlCodeBlock(markdown: string): string {
   }
 
   return match[1]
-}
-
-function resolveHomeActionLinks(frontmatter: HomeFrontmatter, routeLinkMap: Map<string, string>): void {
-  const actions = frontmatter.hero?.actions
-
-  if (!Array.isArray(actions)) return
-
-  for (const action of actions) {
-    const targetPageId = action.nav
-    if (typeof targetPageId !== 'string') continue
-
-    const link = routeLinkMap.get(normalizePageId(targetPageId))
-    if (!link) {
-      throw new Error(`Unable to resolve home action page id: ${targetPageId}`)
-    }
-
-    action.link = link
-    delete action.nav
-  }
 }
 
 function buildRouteLinkMap(navItems: RouteNode[], home: ContentRow): Map<string, string> {
@@ -878,7 +853,7 @@ async function main(): Promise<void> {
 
   await writeArticles(articles, routeLinkMap)
   await writeRoutesFile(site.navItems)
-  await writeHomePage(site.home, routeLinkMap)
+  await writeHomePage(site.home)
 
   console.info(`[notion-sync] Synced ${site.articleCount} article page(s) from Notion.`)
 }
