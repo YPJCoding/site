@@ -121,6 +121,12 @@ type RouteNode = {
   children: RouteNode[]
 }
 
+type ArticleTask = RouteNode & {
+  type: 'article'
+  link: string
+  linkParts: string[]
+}
+
 type SidebarItem = {
   text: string
   link?: string
@@ -149,12 +155,6 @@ type ImageRewriteResult = {
   markdown: string
 }
 
-type ArticleTask = RouteNode & {
-  type: 'article'
-  link: string
-  linkParts: string[]
-}
-
 function normalizeNotionId(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   if (!trimmed) return undefined
@@ -171,7 +171,6 @@ function normalizePageId(pageId: string): string {
 
 function readPositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value)
-
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
@@ -281,31 +280,6 @@ function parseContentRow(value: unknown): ContentRow {
   }
 }
 
-function normalizeSlug(row: ContentRow): string {
-  const slug = row.slug?.trim().replace(/^\/+|\/+$/g, '')
-
-  if (!slug) {
-    throw new Error(`Missing required Slug for ${row.type} row "${row.title}".`)
-  }
-
-  if (slug.includes('/')) {
-    throw new Error(`Slug must be a single route segment for row "${row.title}": ${slug}`)
-  }
-
-  return slug
-}
-
-function sortRows<T extends Pick<ContentRow, 'order' | 'title'>>(rows: T[]): T[] {
-  return [...rows].sort((a, b) => {
-    const orderA = a.order ?? Number.POSITIVE_INFINITY
-    const orderB = b.order ?? Number.POSITIVE_INFINITY
-
-    if (orderA !== orderB) return orderA - orderB
-
-    return a.title.localeCompare(b.title, 'zh-CN')
-  })
-}
-
 async function queryContentRows(): Promise<ContentRow[]> {
   const pages: unknown[] = []
   let startCursor: string | undefined
@@ -393,16 +367,16 @@ function validateContentRows(rows: ContentRow[], rowsById: Map<string, ContentRo
       throw new Error(`Group row "${row.title}" must have a Nav parent.`)
     }
 
-    if (row.type === CONTENT_TYPE.article && parent?.type !== CONTENT_TYPE.group) {
-      throw new Error(`Article row "${row.title}" must have a Group parent.`)
+    if (row.type === CONTENT_TYPE.article && parent?.type !== CONTENT_TYPE.group && parent?.type !== CONTENT_TYPE.nav) {
+      throw new Error(`Article row "${row.title}" must have a Group or Nav parent.`)
     }
   }
 }
 
 function buildNavNode(row: ContentRow, rowsByParent: Map<string, ContentRow[]>, usedSlugs: Set<string>): RouteNode {
   const slug = createUniqueSlug(row, usedSlugs)
-  const groupRows = getChildren(rowsByParent, row, CONTENT_TYPE.group)
-  const usedGroupSlugs = new Set<string>()
+  const childRows = getChildren(rowsByParent, row, CONTENT_TYPE.group, CONTENT_TYPE.article)
+  const usedChildSlugs = new Set<string>()
 
   return {
     id: row.id,
@@ -410,7 +384,13 @@ function buildNavNode(row: ContentRow, rowsByParent: Map<string, ContentRow[]>, 
     type: 'nav',
     slug,
     lastEditedTime: row.lastEditedTime,
-    children: groupRows.map((groupRow) => buildGroupNode(groupRow, rowsByParent, [slug], usedGroupSlugs)),
+    children: childRows.map((childRow) => {
+      if (childRow.type === CONTENT_TYPE.group) {
+        return buildGroupNode(childRow, rowsByParent, [slug], usedChildSlugs)
+      }
+
+      return buildArticleNode(childRow, [slug], usedChildSlugs)
+    }),
   }
 }
 
@@ -462,8 +442,34 @@ function createUniqueSlug(row: ContentRow, usedSlugs: Set<string>): string {
   return slug
 }
 
-function getChildren(rowsByParent: Map<string, ContentRow[]>, parent: ContentRow, type: ContentType): ContentRow[] {
-  return sortRows((rowsByParent.get(normalizePageId(parent.id)) ?? []).filter((row) => row.type === type))
+function normalizeSlug(row: ContentRow): string {
+  const slug = row.slug?.trim().replace(/^\/+|\/+$/g, '')
+
+  if (!slug) {
+    throw new Error(`Missing required Slug for ${row.type} row "${row.title}".`)
+  }
+
+  if (slug.includes('/')) {
+    throw new Error(`Slug must be a single route segment for row "${row.title}": ${slug}`)
+  }
+
+  return slug
+}
+
+function getChildren(rowsByParent: Map<string, ContentRow[]>, parent: ContentRow, ...types: ContentType[]): ContentRow[] {
+  const typeSet = new Set(types)
+  return sortRows((rowsByParent.get(normalizePageId(parent.id)) ?? []).filter((row) => typeSet.has(row.type)))
+}
+
+function sortRows<T extends Pick<ContentRow, 'order' | 'title'>>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const orderA = a.order ?? Number.POSITIVE_INFINITY
+    const orderB = b.order ?? Number.POSITIVE_INFINITY
+
+    if (orderA !== orderB) return orderA - orderB
+
+    return a.title.localeCompare(b.title, 'zh-CN')
+  })
 }
 
 function collectArticles(nodes: RouteNode[]): ArticleTask[] {
