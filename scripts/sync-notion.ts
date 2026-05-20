@@ -15,14 +15,14 @@ const ROUTES_FILE = path.join(GENERATED_DIR, 'notion-routes.ts')
 const HOME_FILE = path.join(DOCS_DIR, 'index.md')
 const NOTION_ASSETS_DIR = path.join(DOCS_DIR, 'public/notion-assets')
 const NOTION_ASSETS_PUBLIC_BASE = '/notion-assets'
-const ARTICLE_HASH_LENGTH = 8
-const ARTICLE_HASH_MAX_LENGTH = 16
 const RESERVED_DOCS_ENTRIES = new Set(['public'])
+const DEFAULT_ARTICLE_CONCURRENCY = 2
+
 const NOTION_PAGE_URL_RE = /https:\/\/www\.notion\.so\/(?:[^\s)\]"'<>`]+\/)?[^\s)\]"'<>`]*?([0-9a-fA-F]{32})(?:[?#][^\s)\]"'<>`]*)?/g
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g
 const HTML_IMAGE_RE = /<img\b([^>]*?)\bsrc=["']([^"']+)["']([^>]*)>/g
 
-const PAGE_TYPE = {
+const CONTENT_TYPE = {
   home: 'Home',
   nav: 'Nav',
   group: 'Group',
@@ -39,14 +39,14 @@ const PROPERTY = {
 
 const notionToken = process.env.NOTION_TOKEN ?? process.env.NOTION_API_KEY
 const notionDataSourceId = normalizeNotionId(process.env.NOTION_DATA_SOURCE_ID)
-const notionDatabaseId = normalizeNotionId(process.env.NOTION_DATABASE_ID)
+const articleConcurrency = readPositiveInteger(process.env.NOTION_SYNC_CONCURRENCY, DEFAULT_ARTICLE_CONCURRENCY)
 
 if (!notionToken) {
   throw new Error('Missing required environment variable: NOTION_TOKEN. You can set it in .env.')
 }
 
-if (!notionDataSourceId && !notionDatabaseId) {
-  throw new Error('Missing required environment variable: NOTION_DATA_SOURCE_ID or NOTION_DATABASE_ID. You can set it in .env.')
+if (!notionDataSourceId) {
+  throw new Error('Missing required environment variable: NOTION_DATA_SOURCE_ID. You can set it in .env.')
 }
 
 const notion = new Client({
@@ -65,54 +65,56 @@ const n2m = new NotionToMarkdown({
   },
 })
 
-type PageType = typeof PAGE_TYPE[keyof typeof PAGE_TYPE]
+type ContentType = typeof CONTENT_TYPE[keyof typeof CONTENT_TYPE]
 type RouteNodeType = 'nav' | 'group' | 'article'
 
-type QueryResponse = {
+type DataSourceQueryResponse = {
   results: unknown[]
   has_more: boolean
   next_cursor: string | null
 }
 
-type QueryInput = {
+type DataSourceQueryInput = {
+  data_source_id: string
   page_size: number
   start_cursor?: string
 }
 
-type NotionQueryClient = Client & {
-  dataSources?: {
-    query: (input: QueryInput & { data_source_id: string }) => Promise<QueryResponse>
-  }
-  databases?: {
-    query: (input: QueryInput & { database_id: string }) => Promise<QueryResponse>
+type NotionDataSourceClient = Client & {
+  dataSources: {
+    query: (input: DataSourceQueryInput) => Promise<DataSourceQueryResponse>
   }
 }
 
 type PagePropertyMap = Record<string, unknown>
 
-type DatabasePage = {
+type NotionPage = {
   id?: string
-  object?: string
   properties?: PagePropertyMap
   last_edited_time?: string
 }
 
-type DatabaseRow = {
+type ContentRow = {
   id: string
   title: string
-  type: PageType
+  type: ContentType
   slug?: string
   order?: number
   parentId?: string
   lastEditedTime?: string
 }
 
+type SiteModel = {
+  home: ContentRow
+  navItems: RouteNode[]
+  articleCount: number
+}
+
 type RouteNode = {
   id: string
   title: string
   type: RouteNodeType
-  segment?: string
-  hash?: string
+  slug: string
   link?: string
   linkParts?: string[]
   lastEditedTime?: string
@@ -147,12 +149,11 @@ type ImageRewriteResult = {
   markdown: string
 }
 
-type BuildResult = {
-  home: DatabaseRow
-  routes: RouteNode[]
+type ArticleTask = RouteNode & {
+  type: 'article'
+  link: string
+  linkParts: string[]
 }
-
-const usedArticleLinks = new Set<string>()
 
 function normalizeNotionId(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
@@ -168,29 +169,10 @@ function normalizePageId(pageId: string): string {
   return pageId.replaceAll('-', '')
 }
 
-function indexToCode(index: number): string {
-  if (!Number.isInteger(index) || index < 0) {
-    throw new Error(`Invalid route index: ${index}`)
-  }
+function readPositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
 
-  let n = index
-  let code = ''
-
-  do {
-    code = String.fromCharCode(97 + (n % 26)) + code
-    n = Math.floor(n / 26) - 1
-  } while (n >= 0)
-
-  return code
-}
-
-function hashPageId(pageId: string, length: number): string {
-  return crypto
-    .createHash('sha256')
-    .update(normalizePageId(pageId))
-    .digest('base64url')
-    .slice(0, length)
-    .toLowerCase()
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
 function toLink(parts: string[]): string {
@@ -217,8 +199,7 @@ function getPlainText(value: unknown): string {
   return value
     .map((item) => {
       if (!isRecord(item)) return ''
-      const plainText = item.plain_text
-      return typeof plainText === 'string' ? plainText : ''
+      return typeof item.plain_text === 'string' ? item.plain_text : ''
     })
     .join('')
     .trim()
@@ -226,12 +207,10 @@ function getPlainText(value: unknown): string {
 
 function getTitle(properties: PagePropertyMap): string {
   const property = properties[PROPERTY.title]
-  if (!isRecord(property)) return ''
-
-  return getPlainText(property.title)
+  return isRecord(property) ? getPlainText(property.title) : ''
 }
 
-function getRichText(properties: PagePropertyMap, key: string): string | undefined {
+function getText(properties: PagePropertyMap, key: string): string | undefined {
   const property = properties[key]
   if (!isRecord(property)) return undefined
 
@@ -241,12 +220,9 @@ function getRichText(properties: PagePropertyMap, key: string): string | undefin
 
 function getSelectName(properties: PagePropertyMap, key: string): string | undefined {
   const property = properties[key]
-  if (!isRecord(property)) return undefined
+  if (!isRecord(property) || !isRecord(property.select)) return undefined
 
-  const select = property.select
-  if (!isRecord(select)) return undefined
-
-  return typeof select.name === 'string' ? select.name : undefined
+  return typeof property.select.name === 'string' ? property.select.name : undefined
 }
 
 function getNumber(properties: PagePropertyMap, key: string): number | undefined {
@@ -263,25 +239,24 @@ function getFirstRelationId(properties: PagePropertyMap, key: string): string | 
   if (!isRecord(property) || !Array.isArray(property.relation)) return undefined
 
   const relation = property.relation[0]
-  if (!isRecord(relation) || typeof relation.id !== 'string') return undefined
-
-  return normalizePageId(relation.id)
+  return isRecord(relation) && typeof relation.id === 'string'
+    ? normalizePageId(relation.id)
+    : undefined
 }
 
-function isPageType(value: string | undefined): value is PageType {
-  return value === PAGE_TYPE.home
-    || value === PAGE_TYPE.nav
-    || value === PAGE_TYPE.group
-    || value === PAGE_TYPE.article
+function isContentType(value: string | undefined): value is ContentType {
+  return value === CONTENT_TYPE.home
+    || value === CONTENT_TYPE.nav
+    || value === CONTENT_TYPE.group
+    || value === CONTENT_TYPE.article
 }
 
-function parseDatabasePage(value: unknown): DatabaseRow {
-  const page = value as DatabasePage
-  const id = page.id
-  const properties = page.properties
+function parseContentRow(value: unknown): ContentRow {
+  const page = value as NotionPage
+  const { id, properties } = page
 
   if (!id || !properties) {
-    throw new Error('Invalid Notion database page response.')
+    throw new Error('Invalid Notion data source page response.')
   }
 
   const title = getTitle(properties)
@@ -291,7 +266,7 @@ function parseDatabasePage(value: unknown): DatabaseRow {
     throw new Error(`Missing required Notion property "${PROPERTY.title}" for page: ${id}`)
   }
 
-  if (!isPageType(type)) {
+  if (!isContentType(type)) {
     throw new Error(`Invalid or missing Notion property "${PROPERTY.type}" for page "${title}".`)
   }
 
@@ -299,14 +274,28 @@ function parseDatabasePage(value: unknown): DatabaseRow {
     id,
     title,
     type,
-    slug: getRichText(properties, PROPERTY.slug),
+    slug: getText(properties, PROPERTY.slug),
     order: getNumber(properties, PROPERTY.order),
     parentId: getFirstRelationId(properties, PROPERTY.parent),
     lastEditedTime: page.last_edited_time,
   }
 }
 
-function sortRows<T extends Pick<DatabaseRow, 'order' | 'title'>>(rows: T[]): T[] {
+function normalizeSlug(row: ContentRow): string {
+  const slug = row.slug?.trim().replace(/^\/+|\/+$/g, '')
+
+  if (!slug) {
+    throw new Error(`Missing required Slug for ${row.type} row "${row.title}".`)
+  }
+
+  if (slug.includes('/')) {
+    throw new Error(`Slug must be a single route segment for row "${row.title}": ${slug}`)
+  }
+
+  return slug
+}
+
+function sortRows<T extends Pick<ContentRow, 'order' | 'title'>>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     const orderA = a.order ?? Number.POSITIVE_INFINITY
     const orderB = b.order ?? Number.POSITIVE_INFINITY
@@ -317,206 +306,144 @@ function sortRows<T extends Pick<DatabaseRow, 'order' | 'title'>>(rows: T[]): T[
   })
 }
 
-function normalizeSlug(value: string | undefined): string | undefined {
-  const slug = value?.trim().replace(/^\/+|\/+$/g, '')
-
-  if (!slug) return undefined
-
-  if (slug.includes('/')) {
-    throw new Error(`Slug must be a single route segment, but received: ${slug}`)
-  }
-
-  return slug
-}
-
-function createSegment(row: DatabaseRow, index: number, usedSegments: Set<string>): string {
-  const segment = normalizeSlug(row.slug) ?? indexToCode(index)
-
-  if (usedSegments.has(segment)) {
-    throw new Error(`Duplicate route segment "${segment}" under the same parent.`)
-  }
-
-  usedSegments.add(segment)
-  return segment
-}
-
-function createArticleSegment(row: DatabaseRow, parentPath: string[]): string {
-  const slug = normalizeSlug(row.slug)
-
-  if (slug) {
-    const link = toLink([...parentPath, slug])
-
-    if (usedArticleLinks.has(link)) {
-      throw new Error(`Duplicate article link: ${link}`)
-    }
-
-    usedArticleLinks.add(link)
-    return slug
-  }
-
-  for (let length = ARTICLE_HASH_LENGTH; length <= ARTICLE_HASH_MAX_LENGTH; length++) {
-    const hash = hashPageId(row.id, length)
-    const link = toLink([...parentPath, hash])
-
-    if (!usedArticleLinks.has(link)) {
-      usedArticleLinks.add(link)
-      return hash
-    }
-  }
-
-  throw new Error(`Unable to create unique article hash for Notion page: ${row.id}`)
-}
-
-async function queryContentRows(): Promise<DatabaseRow[]> {
+async function queryContentRows(): Promise<ContentRow[]> {
   const pages: unknown[] = []
   let startCursor: string | undefined
 
   do {
-    const response = await queryContentPages(startCursor)
+    const response = await (notion as NotionDataSourceClient).dataSources.query({
+      data_source_id: notionDataSourceId!,
+      page_size: 100,
+      ...(startCursor ? { start_cursor: startCursor } : {}),
+    })
 
     pages.push(...response.results)
     startCursor = response.has_more ? response.next_cursor ?? undefined : undefined
   } while (startCursor)
 
-  return pages.map(parseDatabasePage)
+  return pages.map(parseContentRow)
 }
 
-async function queryContentPages(startCursor?: string): Promise<QueryResponse> {
-  const queryInput: QueryInput = {
-    page_size: 100,
-    ...(startCursor ? { start_cursor: startCursor } : {}),
-  }
-  const notionApi = notion as NotionQueryClient
-
-  if (notionDataSourceId && notionApi.dataSources?.query) {
-    return notionApi.dataSources.query({
-      ...queryInput,
-      data_source_id: notionDataSourceId,
-    })
-  }
-
-  if (notionDatabaseId && notionApi.databases?.query) {
-    return notionApi.databases.query({
-      ...queryInput,
-      database_id: notionDatabaseId,
-    })
-  }
-
-  throw new Error('The installed @notionhq/client does not support dataSources.query, and NOTION_DATABASE_ID is not available for databases.query fallback.')
-}
-
-function indexRowsById(rows: DatabaseRow[]): Map<string, DatabaseRow> {
-  const byId = new Map<string, DatabaseRow>()
-
-  for (const row of rows) {
-    const id = normalizePageId(row.id)
-
-    if (byId.has(id)) {
-      throw new Error(`Duplicate Notion page id in query result: ${row.id}`)
-    }
-
-    byId.set(id, row)
-  }
-
-  return byId
-}
-
-function groupRowsByParent(rows: DatabaseRow[]): Map<string, DatabaseRow[]> {
-  const byParent = new Map<string, DatabaseRow[]>()
-
-  for (const row of rows) {
-    if (!row.parentId) continue
-
-    const siblings = byParent.get(row.parentId) ?? []
-    siblings.push(row)
-    byParent.set(row.parentId, siblings)
-  }
-
-  return byParent
-}
-
-function buildSiteModel(rows: DatabaseRow[]): BuildResult {
-  const byId = indexRowsById(rows)
-  const byParent = groupRowsByParent(rows)
-  const homeRows = rows.filter((row) => row.type === PAGE_TYPE.home)
-  const navRows = sortRows(rows.filter((row) => row.type === PAGE_TYPE.nav))
+function buildSiteModel(rows: ContentRow[]): SiteModel {
+  const rowsById = indexRowsById(rows)
+  const rowsByParent = groupRowsByParent(rows)
+  const homeRows = rows.filter((row) => row.type === CONTENT_TYPE.home)
+  const navRows = sortRows(rows.filter((row) => row.type === CONTENT_TYPE.nav))
 
   if (homeRows.length !== 1) {
     throw new Error(`Expected exactly one Home row, but found ${homeRows.length}.`)
   }
 
-  validateHierarchy(rows, byId)
+  validateContentRows(rows, rowsById)
+
+  const usedNavSlugs = new Set<string>()
+  const navItems = navRows.map((row) => buildNavNode(row, rowsByParent, usedNavSlugs))
+  const articleCount = collectArticles(navItems).length
 
   return {
     home: homeRows[0],
-    routes: navRows.map((navRow, navIndex) => buildNavNode(navRow, navIndex, byParent)),
+    navItems,
+    articleCount,
   }
 }
 
-function validateHierarchy(rows: DatabaseRow[], byId: Map<string, DatabaseRow>): void {
-  for (const row of rows) {
-    const parent = row.parentId ? byId.get(row.parentId) : undefined
+function indexRowsById(rows: ContentRow[]): Map<string, ContentRow> {
+  const rowsById = new Map<string, ContentRow>()
 
-    if ((row.type === PAGE_TYPE.home || row.type === PAGE_TYPE.nav) && row.parentId) {
+  for (const row of rows) {
+    const id = normalizePageId(row.id)
+
+    if (rowsById.has(id)) {
+      throw new Error(`Duplicate Notion page id in query result: ${row.id}`)
+    }
+
+    rowsById.set(id, row)
+  }
+
+  return rowsById
+}
+
+function groupRowsByParent(rows: ContentRow[]): Map<string, ContentRow[]> {
+  const rowsByParent = new Map<string, ContentRow[]>()
+
+  for (const row of rows) {
+    if (!row.parentId) continue
+
+    const siblings = rowsByParent.get(row.parentId) ?? []
+    siblings.push(row)
+    rowsByParent.set(row.parentId, siblings)
+  }
+
+  return rowsByParent
+}
+
+function validateContentRows(rows: ContentRow[], rowsById: Map<string, ContentRow>): void {
+  for (const row of rows) {
+    const parent = row.parentId ? rowsById.get(row.parentId) : undefined
+
+    if (row.type !== CONTENT_TYPE.home) {
+      normalizeSlug(row)
+    }
+
+    if ((row.type === CONTENT_TYPE.home || row.type === CONTENT_TYPE.nav) && row.parentId) {
       throw new Error(`${row.type} row "${row.title}" should not have a Parent.`)
     }
 
-    if (row.type === PAGE_TYPE.group && parent?.type !== PAGE_TYPE.nav) {
+    if (row.type === CONTENT_TYPE.group && parent?.type !== CONTENT_TYPE.nav) {
       throw new Error(`Group row "${row.title}" must have a Nav parent.`)
     }
 
-    if (row.type === PAGE_TYPE.article && parent?.type !== PAGE_TYPE.group) {
+    if (row.type === CONTENT_TYPE.article && parent?.type !== CONTENT_TYPE.group) {
       throw new Error(`Article row "${row.title}" must have a Group parent.`)
     }
   }
 }
 
-function buildNavNode(row: DatabaseRow, index: number, byParent: Map<string, DatabaseRow[]>): RouteNode {
-  const segment = createSegment(row, index, new Set<string>())
-  const groups = getTypedChildren(byParent, row, PAGE_TYPE.group)
-  const usedGroupSegments = new Set<string>()
+function buildNavNode(row: ContentRow, rowsByParent: Map<string, ContentRow[]>, usedSlugs: Set<string>): RouteNode {
+  const slug = createUniqueSlug(row, usedSlugs)
+  const groupRows = getChildren(rowsByParent, row, CONTENT_TYPE.group)
+  const usedGroupSlugs = new Set<string>()
 
   return {
     id: row.id,
     title: row.title,
     type: 'nav',
-    segment,
+    slug,
     lastEditedTime: row.lastEditedTime,
-    children: groups.map((groupRow, groupIndex) => buildGroupNode(groupRow, groupIndex, [segment], usedGroupSegments, byParent)),
+    children: groupRows.map((groupRow) => buildGroupNode(groupRow, rowsByParent, [slug], usedGroupSlugs)),
   }
 }
 
 function buildGroupNode(
-  row: DatabaseRow,
-  index: number,
+  row: ContentRow,
+  rowsByParent: Map<string, ContentRow[]>,
   parentPath: string[],
-  usedSegments: Set<string>,
-  byParent: Map<string, DatabaseRow[]>
+  usedSlugs: Set<string>
 ): RouteNode {
-  const segment = createSegment(row, index, usedSegments)
-  const articles = getTypedChildren(byParent, row, PAGE_TYPE.article)
-  const articlePath = [...parentPath, segment]
+  const slug = createUniqueSlug(row, usedSlugs)
+  const articleRows = getChildren(rowsByParent, row, CONTENT_TYPE.article)
+  const articlePath = [...parentPath, slug]
+  const usedArticleSlugs = new Set<string>()
 
   return {
     id: row.id,
     title: row.title,
     type: 'group',
-    segment,
+    slug,
     lastEditedTime: row.lastEditedTime,
-    children: articles.map((articleRow) => buildArticleNode(articleRow, articlePath)),
+    children: articleRows.map((articleRow) => buildArticleNode(articleRow, articlePath, usedArticleSlugs)),
   }
 }
 
-function buildArticleNode(row: DatabaseRow, parentPath: string[]): RouteNode {
-  const segment = createArticleSegment(row, parentPath)
-  const linkParts = [...parentPath, segment]
+function buildArticleNode(row: ContentRow, parentPath: string[], usedSlugs: Set<string>): RouteNode {
+  const slug = createUniqueSlug(row, usedSlugs)
+  const linkParts = [...parentPath, slug]
 
   return {
     id: row.id,
     title: row.title,
     type: 'article',
-    segment,
-    hash: normalizeSlug(row.slug) ? undefined : segment,
+    slug,
     link: toLink(linkParts),
     linkParts,
     lastEditedTime: row.lastEditedTime,
@@ -524,12 +451,40 @@ function buildArticleNode(row: DatabaseRow, parentPath: string[]): RouteNode {
   }
 }
 
-function getTypedChildren(
-  byParent: Map<string, DatabaseRow[]>,
-  parent: DatabaseRow,
-  type: PageType
-): DatabaseRow[] {
-  return sortRows((byParent.get(normalizePageId(parent.id)) ?? []).filter((row) => row.type === type))
+function createUniqueSlug(row: ContentRow, usedSlugs: Set<string>): string {
+  const slug = normalizeSlug(row)
+
+  if (usedSlugs.has(slug)) {
+    throw new Error(`Duplicate Slug "${slug}" under the same parent.`)
+  }
+
+  usedSlugs.add(slug)
+  return slug
+}
+
+function getChildren(rowsByParent: Map<string, ContentRow[]>, parent: ContentRow, type: ContentType): ContentRow[] {
+  return sortRows((rowsByParent.get(normalizePageId(parent.id)) ?? []).filter((row) => row.type === type))
+}
+
+function collectArticles(nodes: RouteNode[]): ArticleTask[] {
+  const articles: ArticleTask[] = []
+
+  function visit(node: RouteNode): void {
+    if (node.type === 'article') {
+      if (!node.link || !node.linkParts) {
+        throw new Error(`Article row "${node.title}" is missing route metadata.`)
+      }
+
+      articles.push(node as ArticleTask)
+      return
+    }
+
+    for (const child of node.children) visit(child)
+  }
+
+  for (const node of nodes) visit(node)
+
+  return articles
 }
 
 function hasH1(markdown: string): boolean {
@@ -556,7 +511,7 @@ function withArticleFrontmatter(markdown: string, lastUpdated?: string): string 
   return `---\nlastUpdated: ${lastUpdated}\n---\n\n${markdown}`
 }
 
-async function cleanDocsDir(): Promise<void> {
+async function cleanGeneratedDocs(): Promise<void> {
   await fs.mkdir(DOCS_DIR, { recursive: true })
 
   const entries = await fs.readdir(DOCS_DIR, { withFileTypes: true })
@@ -571,9 +526,7 @@ async function cleanDocsDir(): Promise<void> {
       })
     })
   )
-}
 
-async function cleanNotionAssetsDir(): Promise<void> {
   await fs.rm(NOTION_ASSETS_DIR, {
     recursive: true,
     force: true,
@@ -581,32 +534,36 @@ async function cleanNotionAssetsDir(): Promise<void> {
   await fs.mkdir(NOTION_ASSETS_DIR, { recursive: true })
 }
 
-async function writeArticles(nodes: RouteNode[], routeLinkMap: Map<string, string>): Promise<void> {
-  for (const node of nodes) {
-    if (node.type === 'article') {
-      await writeArticle(node, routeLinkMap)
-    }
-
-    await writeArticles(node.children, routeLinkMap)
-  }
+async function writeArticles(articles: ArticleTask[], routeLinkMap: Map<string, string>): Promise<void> {
+  await mapWithConcurrency(articles, articleConcurrency, (article) => writeArticle(article, routeLinkMap))
 }
 
-async function writeArticle(node: RouteNode, routeLinkMap: Map<string, string>): Promise<void> {
-  if (!node.linkParts || !node.link) {
-    throw new Error(`Missing article path for Notion page: ${node.id}`)
+async function mapWithConcurrency<T>(items: T[], concurrency: number, task: (item: T) => Promise<void>): Promise<void> {
+  let nextIndex = 0
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex]
+      nextIndex += 1
+      await task(item)
+    }
   }
 
-  const markdownBlocks = await n2m.pageToMarkdown(node.id)
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+}
+
+async function writeArticle(article: ArticleTask, routeLinkMap: Map<string, string>): Promise<void> {
+  const markdownBlocks = await n2m.pageToMarkdown(article.id)
   const markdown = toMarkdownString(markdownBlocks)
   const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
-  const imageRewriteResult = await rewriteNotionImageLinks(linkedMarkdown, node)
-  const content = withArticleFrontmatter(normalizeMarkdown(imageRewriteResult.markdown, node.title), node.lastEditedTime)
-  const targetFile = toMarkdownFile(node.linkParts)
+  const imageRewriteResult = await rewriteNotionImageLinks(linkedMarkdown, article)
+  const content = withArticleFrontmatter(normalizeMarkdown(imageRewriteResult.markdown, article.title), article.lastEditedTime)
+  const targetFile = toMarkdownFile(article.linkParts)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
 
-  console.info(`[notion-sync] Synced article "${node.title}" -> ${node.link}`)
+  console.info(`[notion-sync] Synced article "${article.title}" -> ${article.link}`)
 }
 
 function toMarkdownString(markdownBlocks: unknown): string {
@@ -739,13 +696,13 @@ function getImageExtensionFromUrl(imageUrl: string): string | undefined {
   return undefined
 }
 
-async function writeHomePage(home: DatabaseRow, nodes: RouteNode[], routeLinkMap: Map<string, string>): Promise<void> {
+async function writeHomePage(home: ContentRow, routeLinkMap: Map<string, string>): Promise<void> {
   const markdownBlocks = await n2m.pageToMarkdown(home.id)
   const markdown = toMarkdownString(markdownBlocks)
   const yamlContent = extractFirstYamlCodeBlock(markdown)
   const frontmatter = YAML.parse(yamlContent) as HomeFrontmatter
 
-  resolveHomeActionLinks(frontmatter, nodes, routeLinkMap)
+  resolveHomeActionLinks(frontmatter, routeLinkMap)
 
   await fs.writeFile(HOME_FILE, `---\n${YAML.stringify(frontmatter)}---\n`, 'utf8')
 }
@@ -760,7 +717,7 @@ function extractFirstYamlCodeBlock(markdown: string): string {
   return match[1]
 }
 
-function resolveHomeActionLinks(frontmatter: HomeFrontmatter, nodes: RouteNode[], routeLinkMap: Map<string, string>): void {
+function resolveHomeActionLinks(frontmatter: HomeFrontmatter, routeLinkMap: Map<string, string>): void {
   const actions = frontmatter.hero?.actions
 
   if (!Array.isArray(actions)) return
@@ -777,13 +734,9 @@ function resolveHomeActionLinks(frontmatter: HomeFrontmatter, nodes: RouteNode[]
     action.link = link
     delete action.nav
   }
-
-  if (nodes.length === 0) {
-    console.warn('[notion-sync] Home page actions were resolved, but no nav items were generated.')
-  }
 }
 
-function buildRouteLinkMap(nodes: RouteNode[], home: DatabaseRow): Map<string, string> {
+function buildRouteLinkMap(navItems: RouteNode[], home: ContentRow): Map<string, string> {
   const routeLinkMap = new Map<string, string>()
   routeLinkMap.set(normalizePageId(home.id), '/')
 
@@ -794,14 +747,10 @@ function buildRouteLinkMap(nodes: RouteNode[], home: DatabaseRow): Map<string, s
       routeLinkMap.set(normalizePageId(node.id), link)
     }
 
-    for (const child of node.children) {
-      visit(child)
-    }
+    for (const child of node.children) visit(child)
   }
 
-  for (const node of nodes) {
-    visit(node)
-  }
+  for (const item of navItems) visit(item)
 
   return routeLinkMap
 }
@@ -819,12 +768,12 @@ function findFirstArticleLink(node: RouteNode): string | undefined {
 
 function toSidebarItem(node: RouteNode): SidebarItem | undefined {
   if (node.type === 'article') {
-    if (!node.link) return undefined
-
-    return {
-      text: node.title,
-      link: node.link,
-    }
+    return node.link
+      ? {
+          text: node.title,
+          link: node.link,
+        }
+      : undefined
   }
 
   const items = node.children
@@ -840,11 +789,11 @@ function toSidebarItem(node: RouteNode): SidebarItem | undefined {
   }
 }
 
-function buildNav(nodes: RouteNode[]): NavItem[] {
-  return nodes.flatMap((node) => {
+function buildNav(navItems: RouteNode[]): NavItem[] {
+  return navItems.flatMap((node) => {
     const link = findFirstArticleLink(node)
 
-    if (!link || !node.segment) {
+    if (!link) {
       console.warn(`[notion-sync] Skipped nav "${node.title}" because it has no article page.`)
       return []
     }
@@ -852,7 +801,7 @@ function buildNav(nodes: RouteNode[]): NavItem[] {
     return [{
       text: node.title,
       link,
-      activeMatch: `^/${escapeRegExp(node.segment)}(?:/|$)`,
+      activeMatch: `^/${escapeRegExp(node.slug)}(?:/|$)`,
     }]
   })
 }
@@ -861,19 +810,17 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function buildSidebar(nodes: RouteNode[]): Record<string, SidebarItem[]> {
+function buildSidebar(navItems: RouteNode[]): Record<string, SidebarItem[]> {
   const sidebar: Record<string, SidebarItem[]> = {}
 
-  for (const node of nodes) {
-    if (!node.segment) continue
-
+  for (const node of navItems) {
     const items = node.children
       .map(toSidebarItem)
       .filter((item): item is SidebarItem => Boolean(item))
 
     if (items.length === 0) continue
 
-    sidebar[`/${node.segment}/`] = items
+    sidebar[`/${node.slug}/`] = items
   }
 
   return sidebar
@@ -906,9 +853,9 @@ function serializeValue(value: unknown, indent = 0): string {
   return String(value)
 }
 
-async function writeRoutesFile(nodes: RouteNode[]): Promise<void> {
-  const nav = buildNav(nodes)
-  const sidebar = buildSidebar(nodes)
+async function writeRoutesFile(navItems: RouteNode[]): Promise<void> {
+  const nav = buildNav(navItems)
+  const sidebar = buildSidebar(navItems)
   const content = serializeRoutes(nav, sidebar)
 
   await fs.mkdir(GENERATED_DIR, { recursive: true })
@@ -916,18 +863,18 @@ async function writeRoutesFile(nodes: RouteNode[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  await cleanDocsDir()
-  await cleanNotionAssetsDir()
+  await cleanGeneratedDocs()
 
   const rows = await queryContentRows()
   const site = buildSiteModel(rows)
-  const routeLinkMap = buildRouteLinkMap(site.routes, site.home)
+  const articles = collectArticles(site.navItems)
+  const routeLinkMap = buildRouteLinkMap(site.navItems, site.home)
 
-  await writeArticles(site.routes, routeLinkMap)
-  await writeRoutesFile(site.routes)
-  await writeHomePage(site.home, site.routes, routeLinkMap)
+  await writeArticles(articles, routeLinkMap)
+  await writeRoutesFile(site.navItems)
+  await writeHomePage(site.home, routeLinkMap)
 
-  console.info(`[notion-sync] Synced ${usedArticleLinks.size} article page(s) from Notion.`)
+  console.info(`[notion-sync] Synced ${site.articleCount} article page(s) from Notion.`)
 }
 
 await main()
