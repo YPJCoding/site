@@ -154,6 +154,11 @@ type ImageRewriteResult = {
   markdown: string
 }
 
+type ImageAssetTarget = {
+  publicPath: string
+  filePath: string
+}
+
 type SyncCache = {
   version: number
   routeSignature: string
@@ -696,7 +701,7 @@ async function writeArticles(
       return getCachedArticle(article)
     }
 
-    return writeArticle(article, routeLinkMap)
+  return writeArticle(article, routeLinkMap)
   })
 
   return Object.fromEntries(cachedArticles.map((article) => [article.id, article]))
@@ -779,6 +784,16 @@ async function rewriteNotionImageLinks(markdown: string, node: RouteNode): Promi
 async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): Promise<DownloadedImage | undefined> {
   if (!shouldDownloadImage(imageUrl)) return undefined
 
+  const urlExtension = getImageExtensionFromUrl(imageUrl)
+
+  if (urlExtension) {
+    const target = createImageAssetTarget(imageUrl, node, urlExtension)
+
+    if (await fileExists(target.filePath)) {
+      return target
+    }
+  }
+
   try {
     const response = await fetch(imageUrl)
 
@@ -788,26 +803,19 @@ async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): P
     }
 
     const contentType = response.headers.get('content-type') ?? ''
-    const extension = getImageExtension(imageUrl, contentType)
-    const imageHash = crypto
-      .createHash('sha256')
-      .update(`${normalizePageId(node.id)}:${imageUrl}`)
-      .digest('base64url')
-      .slice(0, 12)
-      .toLowerCase()
-    const pageAssetsDir = path.join(NOTION_ASSETS_DIR, normalizePageId(node.id))
-    const fileName = `${imageHash}${extension}`
-    const filePath = path.join(pageAssetsDir, fileName)
-    const publicPath = `${NOTION_ASSETS_PUBLIC_BASE}/${normalizePageId(node.id)}/${fileName}`
+    const extension = urlExtension ?? getImageExtensionFromContentType(contentType)
+    const target = createImageAssetTarget(imageUrl, node, extension)
+
+    if (await fileExists(target.filePath)) {
+      return target
+    }
+
     const arrayBuffer = await response.arrayBuffer()
 
-    await fs.mkdir(pageAssetsDir, { recursive: true })
-    await fs.writeFile(filePath, Buffer.from(arrayBuffer))
+    await fs.mkdir(path.dirname(target.filePath), { recursive: true })
+    await fs.writeFile(target.filePath, Buffer.from(arrayBuffer))
 
-    return {
-      publicPath,
-      filePath,
-    }
+    return target
   } catch (error) {
     console.warn(`[notion-sync] Failed to download image in "${node.title}": ${imageUrl}`)
     if (error instanceof Error) {
@@ -818,11 +826,27 @@ async function downloadNotionImageIfNeeded(imageUrl: string, node: RouteNode): P
   }
 }
 
+function createImageAssetTarget(imageUrl: string, node: RouteNode, extension: string): ImageAssetTarget {
+  const imageHash = crypto
+    .createHash('sha256')
+    .update(`${normalizePageId(node.id)}:${imageUrl}`)
+    .digest('base64url')
+    .slice(0, 12)
+    .toLowerCase()
+  const pageAssetsDir = path.join(NOTION_ASSETS_DIR, normalizePageId(node.id))
+  const fileName = `${imageHash}${extension}`
+
+  return {
+    publicPath: `${NOTION_ASSETS_PUBLIC_BASE}/${normalizePageId(node.id)}/${fileName}`,
+    filePath: path.join(pageAssetsDir, fileName),
+  }
+}
+
 function shouldDownloadImage(imageUrl: string): boolean {
   try {
     const url = new URL(imageUrl)
     const hostname = url.hostname.toLowerCase()
-
+    
     return hostname.includes('notion.so')
       || hostname.includes('notion-static.com')
       || hostname.includes('notionusercontent.com')
@@ -833,10 +857,7 @@ function shouldDownloadImage(imageUrl: string): boolean {
   }
 }
 
-function getImageExtension(imageUrl: string, contentType: string): string {
-  const urlExtension = getImageExtensionFromUrl(imageUrl)
-  if (urlExtension) return urlExtension
-
+function getImageExtensionFromContentType(contentType: string): string {
   const normalizedContentType = contentType.split(';')[0]?.trim().toLowerCase()
   const contentTypeMap: Record<string, string> = {
     'image/jpeg': '.jpg',
@@ -891,7 +912,7 @@ function buildRouteLinkMap(navItems: RouteNode[], home: ContentRow): Map<string,
   function visit(node: RouteNode): void {
     const link = findFirstArticleLink(node)
 
-    if (link) {
+  if (link) {
       routeLinkMap.set(normalizePageId(node.id), link)
     }
 
