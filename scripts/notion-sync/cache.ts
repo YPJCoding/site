@@ -1,8 +1,7 @@
 import fs from 'node:fs/promises'
 import { LOCAL_NOTION_ASSET_RE, SYNC_CACHE_VERSION } from './constants'
-import { SYNC_CACHE_FILE } from './paths'
+import { CACHE_DIR, SYNC_CACHE_FILE, toLocalPublicFilePath, toProjectRelativePath } from './paths'
 import { getArticleOutputFile } from './model'
-import { toLocalPublicFilePath, toProjectRelativePath } from './paths'
 import type { ArticleTask, CachedArticle, SyncCache } from './types'
 import { fileExists } from './filesystem'
 import { isNodeError, isRecord, normalizePageId } from './utils'
@@ -35,7 +34,7 @@ export async function readSyncCache(): Promise<SyncCache | undefined> {
  * @param cache 本次同步完成后的缓存。
  */
 export async function writeSyncCache(cache: SyncCache): Promise<void> {
-  await fs.mkdir(SYNC_CACHE_FILE.replace(/\/[^/]+$/, ''), { recursive: true })
+  await fs.mkdir(CACHE_DIR, { recursive: true })
   await fs.writeFile(SYNC_CACHE_FILE, `${JSON.stringify(cache, null, 2)}\n`, 'utf8')
 }
 
