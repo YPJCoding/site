@@ -1,4 +1,5 @@
-import { canReuseArticle, getCachedArticle, readSyncCache, writeSyncCache } from './notion-sync/cache'
+import { SYNC_CACHE_VERSION } from './notion-sync/constants'
+import { readSyncCache, writeSyncCache } from './notion-sync/cache'
 import { createNotionClient, createNotionToMarkdown, loadSyncConfig } from './notion-sync/config'
 import { prepareGeneratedDocs } from './notion-sync/filesystem'
 import { writeArticles, writeHomePage } from './notion-sync/markdown'
@@ -37,7 +38,7 @@ async function main(): Promise<void> {
   await writeRoutesFile(site.navItems)
   await writeHomePage(site.home, n2m)
   await writeSyncCache({
-    version: 1,
+    version: SYNC_CACHE_VERSION,
     routeSignature,
     articles: result.articles,
   })
