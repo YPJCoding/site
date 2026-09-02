@@ -6,9 +6,9 @@ export interface ResumeSettings {
 }
 
 export const DEFAULT_RESUME_SETTINGS: ResumeSettings = {
-  vertical: 14,
-  horizontal: 14,
-  lineHeight: 22,
+  vertical: 10,
+  horizontal: 7,
+  lineHeight: 28,
   themeColor: '#2563eb',
 }
 
