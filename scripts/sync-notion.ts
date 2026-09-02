@@ -16,6 +16,7 @@ async function main(): Promise<void> {
   const config = loadSyncConfig()
   const notion = createNotionClient(config.notionToken)
   const n2m = createNotionToMarkdown(notion)
+  const resumeN2m = createNotionToMarkdown(notion, true)
 
   const rows = await queryContentRows(notion, config.notionDataSourceId)
   const site = buildSiteModel(rows)
@@ -32,7 +33,8 @@ async function main(): Promise<void> {
     oldCache,
     routeSignature,
     config.articleConcurrency,
-    n2m
+    n2m,
+    resumeN2m
   )
 
   await writeRoutesFile(site.navItems)

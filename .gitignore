@@ -1,4 +1,3 @@
-pnpm-lock.yaml
 pnpm-workspace.yaml
 
 
@@ -44,6 +43,7 @@ docs/*
 !docs/public/
 !docs/public/**
 docs/public/notion-assets/
+docs/public/resume/
 
 # Notion generated VitePress routes
 .vitepress/generated/notion-routes.ts

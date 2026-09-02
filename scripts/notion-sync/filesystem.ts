@@ -1,7 +1,14 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { RESERVED_DOCS_ENTRIES } from './constants'
-import { DOCS_DIR, NOTION_ASSETS_DIR, fromProjectRelativePath, toProjectRelativePath } from './paths'
+import { CONTENT_TYPE, RESERVED_DOCS_ENTRIES } from './constants'
+import {
+  DOCS_DIR,
+  NOTION_ASSETS_DIR,
+  RESUME_EXPORTS_DIR,
+  fromProjectRelativePath,
+  toProjectRelativePath,
+  toResumeMarkdownFile,
+} from './paths'
 import type { ArticleTask, SyncCache } from './types'
 import { isNodeError } from './utils'
 import { getArticleOutputFile } from './model'
@@ -33,6 +40,7 @@ export async function fileExists(filePath: string): Promise<boolean> {
 export async function prepareGeneratedDocs(oldCache: SyncCache | undefined, articles: ArticleTask[]): Promise<void> {
   await fs.mkdir(DOCS_DIR, { recursive: true })
   await fs.mkdir(NOTION_ASSETS_DIR, { recursive: true })
+  await cleanGeneratedResumeExports(articles)
 
   if (!oldCache) {
     await cleanGeneratedArticleDocs()
@@ -50,6 +58,54 @@ export async function prepareGeneratedDocs(oldCache: SyncCache | undefined, arti
       })
     })
   )
+}
+
+/**
+ * 清理已经不存在的简历 Markdown 下载文件。
+ *
+ * `docs/public/resume` 是同步脚本专用的静态导出目录，不删除其他 public 资源。
+ *
+ * @param articles 当前数据库模型中的文章任务。
+ */
+async function cleanGeneratedResumeExports(articles: ArticleTask[]): Promise<void> {
+  await fs.mkdir(RESUME_EXPORTS_DIR, { recursive: true })
+
+  const currentFiles = new Set(
+    articles
+      .filter((article) => article.contentType === CONTENT_TYPE.resume)
+      .map((article) => toResumeMarkdownFile(article.linkParts))
+  )
+
+  const existingFiles = await collectMarkdownFiles(RESUME_EXPORTS_DIR)
+
+  await Promise.all(
+    existingFiles
+      .filter((filePath) => !currentFiles.has(filePath))
+      .map((filePath) => fs.rm(filePath, { force: true }))
+  )
+}
+
+/**
+ * 递归收集目录下的 Markdown 文件。
+ *
+ * @param directory 待扫描目录。
+ * @returns Markdown 文件绝对路径。
+ */
+async function collectMarkdownFiles(directory: string): Promise<string[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const filePath = path.join(directory, entry.name)
+
+    if (entry.isDirectory()) {
+      files.push(...await collectMarkdownFiles(filePath))
+    } else if (entry.isFile() && entry.name.endsWith('.md.txt')) {
+      files.push(filePath)
+    }
+  }
+
+  return files
 }
 
 /**

@@ -2,6 +2,7 @@ import { Client } from '@notionhq/client'
 import dotenv from 'dotenv'
 import { NotionToMarkdown } from 'notion-to-md'
 import { DEFAULT_ARTICLE_CONCURRENCY } from './constants'
+import { registerColumnListTransformer } from './columns'
 import { normalizeNotionId, readPositiveInteger } from './utils'
 
 dotenv.config({ path: '.env' })
@@ -58,13 +59,18 @@ export function createNotionClient(notionToken: string): Client {
  * 创建 notion-to-md 转换器。
  *
  * @param notion Notion SDK Client。
+ * @param useResumeColumns 是否注册简历专用的多列转换器。
  * @returns NotionToMarkdown 实例。
  */
-export function createNotionToMarkdown(notion: Client): NotionToMarkdown {
-  return new NotionToMarkdown({
+export function createNotionToMarkdown(notion: Client, useResumeColumns = false): NotionToMarkdown {
+  const n2m = new NotionToMarkdown({
     notionClient: notion,
     config: {
       parseChildPages: false,
     },
   })
+
+  if (useResumeColumns) registerColumnListTransformer(notion, n2m)
+
+  return n2m
 }

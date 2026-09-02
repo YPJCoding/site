@@ -30,8 +30,8 @@ pnpm run notion:sync
 
 同步脚本会完成以下工作：
 
-1. 读取 Notion 根页面下的页面树。
-2. 根据 Notion 页面顺序生成顶部导航和侧边栏。
+1. 分页读取 Notion 内容数据源中的页面行。
+2. 根据 `Parent` 和 `Order` 生成顶部导航和侧边栏。
 3. 将 Notion 文章页转换为 Markdown。
 4. 将 Notion 首页页面中的 YAML 代码块生成为 `docs/index.md`。
 5. 将文章内的 Notion 页面链接转换为站内链接。
@@ -51,7 +51,7 @@ docs/c/**
 
 ## Notion 页面结构约定
 
-Notion 根页面由环境变量 `NOTION_ROOT_PAGE_ID` 指定。
+Notion 内容数据源由环境变量 `NOTION_DATA_SOURCE_ID` 指定。
 
 推荐结构：
 
@@ -69,12 +69,25 @@ VitePress Test
 
 约定规则：
 
-- 根页面下的一级页面会生成顶部导航。
-- `NOTION_HOME_PAGE_ID` 指定的页面会被当作首页，不会进入顶部导航。
+- `Type=Nav` 的顶层页面会生成顶部导航。
+- `Type=Home` 的页面会被当作首页，不会进入顶部导航。
 - 有子页面的页面会被视为 sidebar group。
 - 没有子页面的页面会被视为 article。
+- `Type=Resume` 的页面也会作为文章参与路由，但会自动使用简历模式。
 - Notion 中的页面顺序就是站点中的导航、分组和文章顺序。
 - group 默认展开。
+
+### 简历页面
+
+在 VitePress 数据源中将简历页面的 `Type` 设置为 `Resume`：
+
+```text
+Title: 个人简历
+Type: Resume
+Slug: personal-resume
+```
+
+同步后会自动生成 `resume: true` frontmatter，由自定义 VitePress 主题启用简历布局。简历正文仍然按照普通 Notion 文章维护。
 
 ## URL 规则
 
@@ -97,7 +110,7 @@ VitePress Test
 
 ## 首页维护方式
 
-首页由 `NOTION_HOME_PAGE_ID` 指定的 Notion 页面生成。
+首页由数据源中 `Type=Home` 的 Notion 页面生成。
 
 首页页面中需要放置一个 `yaml` 代码块，内容会被写入 `docs/index.md` 的 frontmatter。
 
@@ -138,7 +151,7 @@ features:
 
 ## 支持的 Notion 内容类型
 
-当前同步链路适合普通文档型内容。
+当前同步链路适合普通文档型内容，也支持简历页面使用的多列布局。
 
 推荐使用：
 
@@ -172,7 +185,7 @@ features:
 - Button / 按钮块
 - Embed / 第三方嵌入
 - PDF、Figma、Google Drive 等复杂嵌入
-- 多列布局
+- 多列布局（简历页面已支持；普通文章不建议依赖）
 - 评论和讨论
 
 这些内容即使 Notion 中可以正常展示，也未必能稳定转换为 VitePress Markdown。
@@ -185,15 +198,13 @@ features:
 
 ```env
 NOTION_TOKEN=secret_xxx
-NOTION_ROOT_PAGE_ID=362fec1b60548042aefff824d5c13a08
-NOTION_HOME_PAGE_ID=363fec1b605480fcb4b4e510057c0766
+NOTION_DATA_SOURCE_ID=collection_xxx
 ```
 
 说明：
 
 - `NOTION_TOKEN`：Notion integration token。
-- `NOTION_ROOT_PAGE_ID`：内容根页面 ID。
-- `NOTION_HOME_PAGE_ID`：首页页面 ID。
+- `NOTION_DATA_SOURCE_ID`：VitePress 内容数据源 ID。
 
 Notion 页面需要在页面右上角 `Connections` 中添加对应 integration，否则 API 无法读取页面内容。
 
@@ -229,7 +240,7 @@ pnpm run docs:build
 pnpm run docs:preview
 ```
 
-`docs:dev` 和 `docs:build` 会自动先执行 `notion:sync`。
+`docs:build` 会自动先执行 `notion:sync`；`docs:dev` 使用当前已有的生成文件，不会自动同步 Notion。
 
 ## 生产部署
 
@@ -237,8 +248,7 @@ pnpm run docs:preview
 
 ```env
 NOTION_TOKEN=secret_xxx
-NOTION_ROOT_PAGE_ID=362fec1b60548042aefff824d5c13a08
-NOTION_HOME_PAGE_ID=363fec1b605480fcb4b4e510057c0766
+NOTION_DATA_SOURCE_ID=collection_xxx
 ```
 
 构建命令：
@@ -253,6 +263,22 @@ pnpm run docs:build
 .vitepress/dist
 ```
 
+## 简历页面操作
+
+`Type=Resume` 的页面会在正文上方显示一个“导出”下拉菜单，包含以下选项：
+
+- `导出 Markdown`：下载同步时生成的干净 Markdown 文件。
+- `导出 PDF`：打开浏览器打印窗口，并使用 A4 打印样式，可选择“另存为 PDF”。
+- `导出 PNG`：下载按 A4 页面生成的 PNG 图片。
+
+导出说明：
+
+- PDF 导出依赖浏览器打印功能，实际文件需要在打印窗口中选择“另存为 PDF”；打印机边距、页眉页脚等浏览器设置可能影响结果。
+- Markdown 导出保留简历多列布局所需的 HTML，并使用站点路径引用 Notion 图片资源，下载后在其他 Markdown 工具中打开时可能需要调整样式或图片路径。
+- PNG 导出依赖浏览器对 HTML/CSS 的画布渲染，复杂样式或跨域图片在不同浏览器中可能存在显示差异。
+
+简历模式只调整正文的排版，页面顶部导航、左侧栏和右侧大纲在预览时仍然保留；打印或导出 PDF 时才会隐藏这些站点 UI。
+
 ## Git 提交约定
 
 以下内容是同步生成物，不提交到 Git：
@@ -263,12 +289,13 @@ docs/a/**
 docs/b/**
 docs/c/**
 .vitepress/generated/notion-routes.ts
+docs/public/resume/**
 ```
 
-仓库中只保留：
+仓库中保留需要随站点发布的静态资源；Notion 同步生成的简历 Markdown 导出文件不提交：
 
 ```text
-docs/public/**
+docs/public/**（不包含 docs/public/resume/**）
 scripts/sync-notion.ts
 .vitepress/**
 ```

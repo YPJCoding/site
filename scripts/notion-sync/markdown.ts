@@ -2,14 +2,15 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { NotionToMarkdown } from 'notion-to-md'
 import YAML from 'yaml'
-import { HTML_IMAGE_RE, MARKDOWN_IMAGE_RE, NOTION_PAGE_URL_RE } from './constants'
-import { HOME_FILE } from './paths'
+import { CONTENT_TYPE, HTML_IMAGE_RE, MARKDOWN_IMAGE_RE, NOTION_PAGE_URL_RE } from './constants'
+import { HOME_FILE, toResumeMarkdownFile, toResumeMarkdownPublicPath } from './paths'
 import { getArticleOutputFile } from './model'
 import { downloadNotionImageIfNeeded } from './assets'
 import { canReuseArticle, getCachedArticle } from './cache'
 import { mapWithConcurrency } from './filesystem'
 import type { ArticleTask, CachedArticle, HomeFrontmatter, ImageRewriteResult, RouteNode, SyncCache, SyncStats } from './types'
 import { normalizePageId } from './utils'
+import { cleanResumeMarkdown } from '../resume/clean-markdown'
 
 /**
  * 批量写入文章 Markdown，支持增量复用未变化文章。
@@ -19,7 +20,8 @@ import { normalizePageId } from './utils'
  * @param oldCache 上一次同步缓存。
  * @param routeSignature 本次路由签名。
  * @param concurrency 文章同步并发数。
- * @param n2m notion-to-md 实例。
+ * @param n2m 普通文章使用的 notion-to-md 实例。
+ * @param resumeN2m 简历文章使用的 notion-to-md 实例。
  * @returns 新缓存中的文章记录和同步统计。
  */
 export async function writeArticles(
@@ -28,7 +30,8 @@ export async function writeArticles(
   oldCache: SyncCache | undefined,
   routeSignature: string,
   concurrency: number,
-  n2m: NotionToMarkdown
+  n2m: NotionToMarkdown,
+  resumeN2m: NotionToMarkdown
 ): Promise<{ articles: Record<string, CachedArticle>, stats: SyncStats }> {
   const stats: SyncStats = {
     synced: 0,
@@ -42,7 +45,7 @@ export async function writeArticles(
     }
 
     stats.synced += 1
-    return writeArticle(article, routeLinkMap, n2m)
+    return writeArticle(article, routeLinkMap, article.contentType === CONTENT_TYPE.resume ? resumeN2m : n2m)
   })
 
   return {
@@ -83,11 +86,22 @@ async function writeArticle(
   const markdown = toMarkdownString(markdownBlocks, n2m)
   const linkedMarkdown = rewriteNotionPageLinks(markdown, routeLinkMap)
   const imageRewriteResult = await rewriteNotionImageLinks(linkedMarkdown, article)
-  const content = withArticleFrontmatter(normalizeMarkdown(imageRewriteResult.markdown, article.title), article.lastEditedTime)
+  const content = withArticleFrontmatter(
+    normalizeMarkdown(imageRewriteResult.markdown, article.title),
+    article.lastEditedTime,
+    article.contentType,
+    article.contentType === CONTENT_TYPE.resume ? toResumeMarkdownPublicPath(article.linkParts) : undefined
+  )
   const targetFile = getArticleOutputFile(article)
 
   await fs.mkdir(path.dirname(targetFile), { recursive: true })
   await fs.writeFile(targetFile, content, 'utf8')
+
+  if (article.contentType === CONTENT_TYPE.resume) {
+    const exportFile = toResumeMarkdownFile(article.linkParts)
+    await fs.mkdir(path.dirname(exportFile), { recursive: true })
+    await fs.writeFile(exportFile, cleanResumeMarkdown(content), 'utf8')
+  }
 
   console.info(`[notion-sync] Synced article "${article.title}" -> ${article.link}`)
 
@@ -192,10 +206,26 @@ function normalizeMarkdown(markdown: string, title: string): string {
  *
  * @param markdown Markdown 正文。
  * @param lastUpdated Notion last_edited_time。
+ * @param contentType Notion 内容类型；Resume 页面额外带有专用标识。
+ * @param resumeMarkdownPath 页面上的 Markdown 下载地址。
  * @returns 带 frontmatter 的 Markdown。
  */
-function withArticleFrontmatter(markdown: string, lastUpdated?: string): string {
-  if (!lastUpdated) return markdown
+function withArticleFrontmatter(
+  markdown: string,
+  lastUpdated?: string,
+  contentType?: ArticleTask['contentType'],
+  resumeMarkdownPath?: string
+): string {
+  if (contentType !== CONTENT_TYPE.resume && !lastUpdated) return markdown
+
+  if (contentType === CONTENT_TYPE.resume) {
+    const fields = ['resume: true']
+
+    if (lastUpdated) fields.push(`lastUpdated: ${lastUpdated}`)
+    if (resumeMarkdownPath) fields.push(`resumeMarkdown: ${resumeMarkdownPath}`)
+
+    return `---\n${fields.join('\n')}\n---\n\n${markdown}`
+  }
 
   return `---\nlastUpdated: ${lastUpdated}\n---\n\n${markdown}`
 }

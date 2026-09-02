@@ -162,11 +162,11 @@ function validateContentRows(rows: ContentRow[], rowsById: Map<string, ContentRo
   for (const row of rows) {
     const parent = row.parentId ? rowsById.get(row.parentId) : undefined
 
-    if (row.type !== CONTENT_TYPE.home) {
+    if (row.type !== CONTENT_TYPE.home && row.type !== CONTENT_TYPE.config) {
       normalizeSlug(row)
     }
 
-    if ((row.type === CONTENT_TYPE.home || row.type === CONTENT_TYPE.nav) && row.parentId) {
+    if ((row.type === CONTENT_TYPE.home || row.type === CONTENT_TYPE.nav || row.type === CONTENT_TYPE.config) && row.parentId) {
       throw new Error(`${row.type} row "${row.title}" should not have a Parent.`)
     }
 
@@ -174,8 +174,8 @@ function validateContentRows(rows: ContentRow[], rowsById: Map<string, ContentRo
       throw new Error(`Group row "${row.title}" must have a Nav parent.`)
     }
 
-    if (row.type === CONTENT_TYPE.article && parent?.type !== CONTENT_TYPE.group && parent?.type !== CONTENT_TYPE.nav) {
-      throw new Error(`Article row "${row.title}" must have a Group or Nav parent.`)
+    if (isArticleContentType(row.type) && parent?.type !== CONTENT_TYPE.group && parent?.type !== CONTENT_TYPE.nav) {
+      throw new Error(`${row.type} row "${row.title}" must have a Group or Nav parent.`)
     }
   }
 }
@@ -190,7 +190,7 @@ function validateContentRows(rows: ContentRow[], rowsById: Map<string, ContentRo
  */
 function buildNavNode(row: ContentRow, rowsByParent: Map<string, ContentRow[]>, usedSlugs: Set<string>): RouteNode {
   const slug = createUniqueSlug(row, usedSlugs)
-  const childRows = getChildren(rowsByParent, row, CONTENT_TYPE.group, CONTENT_TYPE.article)
+  const childRows = getChildren(rowsByParent, row, CONTENT_TYPE.group, CONTENT_TYPE.article, CONTENT_TYPE.resume)
   const usedChildSlugs = new Set<string>()
 
   return {
@@ -225,7 +225,7 @@ function buildGroupNode(
   usedSlugs: Set<string>
 ): RouteNode {
   const slug = createUniqueSlug(row, usedSlugs)
-  const articleRows = getChildren(rowsByParent, row, CONTENT_TYPE.article)
+  const articleRows = getChildren(rowsByParent, row, CONTENT_TYPE.article, CONTENT_TYPE.resume)
   const articlePath = [...parentPath, slug]
   const usedArticleSlugs = new Set<string>()
 
@@ -248,6 +248,10 @@ function buildGroupNode(
  * @returns 文章路由节点。
  */
 function buildArticleNode(row: ContentRow, parentPath: string[], usedSlugs: Set<string>): RouteNode {
+  if (!isArticleContentType(row.type)) {
+    throw new Error(`Cannot build article route for ${row.type} row "${row.title}".`)
+  }
+
   const slug = createUniqueSlug(row, usedSlugs)
   const linkParts = [...parentPath, slug]
 
@@ -255,12 +259,23 @@ function buildArticleNode(row: ContentRow, parentPath: string[], usedSlugs: Set<
     id: row.id,
     title: row.title,
     type: 'article',
+    ...(row.type === CONTENT_TYPE.resume ? { contentType: row.type } : {}),
     slug,
     link: toLink(linkParts),
     linkParts,
     lastEditedTime: row.lastEditedTime,
     children: [],
   }
+}
+
+/**
+ * 判断 Notion 内容行是否属于可生成文章页面的类型。
+ *
+ * @param value Notion 内容类型。
+ * @returns 是否为普通文章或简历文章。
+ */
+function isArticleContentType(value: ContentType): value is typeof CONTENT_TYPE.article | typeof CONTENT_TYPE.resume {
+  return value === CONTENT_TYPE.article || value === CONTENT_TYPE.resume
 }
 
 /**

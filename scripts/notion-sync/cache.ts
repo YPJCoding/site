@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
-import { LOCAL_NOTION_ASSET_RE, SYNC_CACHE_VERSION } from './constants'
-import { CACHE_DIR, SYNC_CACHE_FILE, toLocalPublicFilePath, toProjectRelativePath } from './paths'
+import { CONTENT_TYPE, LOCAL_NOTION_ASSET_RE, SYNC_CACHE_VERSION } from './constants'
+import { CACHE_DIR, SYNC_CACHE_FILE, toLocalPublicFilePath, toProjectRelativePath, toResumeMarkdownFile } from './paths'
 import { getArticleOutputFile } from './model'
 import type { ArticleTask, CachedArticle, SyncCache } from './types'
 import { fileExists } from './filesystem'
@@ -86,6 +86,7 @@ export async function canReuseArticle(
   const articleFile = getArticleOutputFile(article)
 
   if (!(await fileExists(articleFile))) return false
+  if (article.contentType === CONTENT_TYPE.resume && !(await fileExists(toResumeMarkdownFile(article.linkParts)))) return false
 
   return articleLocalAssetsExist(articleFile)
 }

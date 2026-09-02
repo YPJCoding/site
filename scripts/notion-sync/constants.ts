@@ -3,6 +3,8 @@ export const CONTENT_TYPE = {
   nav: 'Nav',
   group: 'Group',
   article: 'Article',
+  resume: 'Resume',
+  config: 'Config',
 } as const
 
 export const PROPERTY = {
@@ -13,7 +15,9 @@ export const PROPERTY = {
   parent: 'Parent',
 } as const
 
-export const SYNC_CACHE_VERSION = 1
+// Bump when the generated Markdown shape changes, so cached pages are rendered
+// again with the current Notion block transformers.
+export const SYNC_CACHE_VERSION = 4
 export const DEFAULT_ARTICLE_CONCURRENCY = 2
 export const RESERVED_DOCS_ENTRIES = new Set(['public'])
 

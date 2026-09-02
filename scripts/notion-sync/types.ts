@@ -50,6 +50,8 @@ export type RouteNode = {
   id: string
   title: string
   type: RouteNodeType
+  /** Notion Type，保留 Resume 与普通 Article 的来源差异。 */
+  contentType?: ContentType
   slug: string
   link?: string
   linkParts?: string[]

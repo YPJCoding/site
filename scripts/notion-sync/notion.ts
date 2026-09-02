@@ -166,4 +166,6 @@ function isContentType(value: string | undefined): value is ContentType {
     || value === CONTENT_TYPE.nav
     || value === CONTENT_TYPE.group
     || value === CONTENT_TYPE.article
+    || value === CONTENT_TYPE.resume
+    || value === CONTENT_TYPE.config
 }

@@ -10,6 +10,7 @@ export const HOME_FILE = path.join(DOCS_DIR, 'index.md')
 
 export const NOTION_ASSETS_DIR = path.join(DOCS_DIR, 'public/notion-assets')
 export const NOTION_ASSETS_PUBLIC_BASE = '/notion-assets'
+export const RESUME_EXPORTS_DIR = path.join(DOCS_DIR, 'public/resume')
 
 /**
  * 根据站点路由片段生成文章 Markdown 文件绝对路径。
@@ -21,6 +22,26 @@ export function toMarkdownFile(parts: string[]): string {
   const fileName = `${parts.at(-1)}.md`
   const dirParts = parts.slice(0, -1)
   return path.join(DOCS_DIR, ...dirParts, fileName)
+}
+
+/**
+ * 根据简历路由片段生成页面上的 Markdown 下载地址。
+ *
+ * @param parts 从 Nav 到 Resume 的路由片段。
+ * @returns public 目录下的站内地址。
+ */
+export function toResumeMarkdownPublicPath(parts: string[]): string {
+  return `/resume/${parts.join('/')}.md.txt`
+}
+
+/**
+ * 根据简历路由片段生成 Markdown 下载文件路径。
+ *
+ * @param parts 从 Nav 到 Resume 的路由片段。
+ * @returns 简历导出文件绝对路径。
+ */
+export function toResumeMarkdownFile(parts: string[]): string {
+  return path.join(RESUME_EXPORTS_DIR, ...parts.slice(0, -1), `${parts.at(-1)}.md.txt`)
 }
 
 /**
