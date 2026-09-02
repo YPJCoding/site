@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Resume PingFang SC";
+  src: url("/fonts/PingFangSC-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html.resume-mode {
   --resume-page-width: 210mm;
   --resume-page-height: 297mm;
@@ -10,6 +18,7 @@ html.resume-mode {
   --resume-accent: #2563eb;
   --resume-rule: var(--vp-c-divider, #dbe3ee);
   --resume-code-bg: #eef4ff;
+  --resume-font-family: "Resume PingFang SC", "PingFang SC", "苹方-简", "苹方-繁", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
 }
 
 html.resume-mode,
@@ -35,6 +44,7 @@ html.resume-mode .resume-toolbar {
   border-radius: 8px;
   background: #f8fafc;
   box-sizing: border-box;
+  font-family: var(--resume-font-family);
 }
 
 html.resume-mode .resume-settings-toolbar {
@@ -65,6 +75,7 @@ html.resume-mode .resume-settings-control input {
   background: #fff;
   font: inherit;
   text-align: center;
+  outline: none;
 }
 
 html.resume-mode .resume-theme-control input[type="color"] {
@@ -113,7 +124,6 @@ html.resume-mode .resume-settings-step-button:hover {
   background: var(--resume-code-bg);
 }
 
-html.resume-mode .resume-settings-control input:focus-visible,
 html.resume-mode .resume-settings-step-button:focus-visible,
 html.resume-mode .resume-settings-reset:focus-visible {
   outline: 2px solid var(--resume-accent);
@@ -288,17 +298,20 @@ html.resume-mode .resume-action-error {
 
 @media (max-width: 720px) {
   html.resume-mode .resume-toolbar {
+    flex-direction: column;
     align-items: stretch;
     padding: 0.6rem 0.65rem;
   }
 
   html.resume-mode .resume-settings-toolbar {
-    flex-basis: 100%;
+    width: 100%;
+    flex: 0 0 auto;
   }
 
   html.resume-mode .resume-actions {
     justify-content: flex-start;
-    flex-basis: 100%;
+    width: 100%;
+    flex: 0 0 auto;
   }
 }
 
