@@ -309,7 +309,7 @@ html.resume-mode .resume-action-error {
   }
 
   html.resume-mode .resume-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
     width: 100%;
     flex: 0 0 auto;
   }
