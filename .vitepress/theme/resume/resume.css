@@ -298,19 +298,19 @@ html.resume-mode .resume-action-error {
 
 @media (max-width: 720px) {
   html.resume-mode .resume-toolbar {
-    flex-direction: column;
+    flex-direction: row;
     align-items: stretch;
     padding: 0.6rem 0.65rem;
   }
 
   html.resume-mode .resume-settings-toolbar {
-    width: 100%;
-    flex: 0 0 auto;
+    width: auto;
+    flex: 1 1 0;
   }
 
   html.resume-mode .resume-actions {
     justify-content: flex-end;
-    width: 100%;
+    width: auto;
     flex: 0 0 auto;
   }
 }
