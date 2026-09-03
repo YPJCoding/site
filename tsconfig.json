@@ -16,7 +16,8 @@
   },
   "include": [
     ".vitepress/**/*.ts",
-    ".vitepress/**/*.d.ts"
+    ".vitepress/**/*.d.ts",
+    "scripts/**/*.ts"
   ],
   "exclude": [
     ".vitepress/dist",

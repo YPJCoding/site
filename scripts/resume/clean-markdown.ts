@@ -4,7 +4,6 @@ const VITEPRESS_ONLY_KEYS = new Set([
   'layout',
   'resume',
   'resumeMarkdown',
-  'resumeTheme',
   'lastUpdated',
   'pageClass',
   'navbar',

@@ -23,7 +23,6 @@ const safeTitle = computed(() => {
 })
 
 const markdownFilename = computed(() => `${safeTitle.value}.md`)
-const isExporting = computed(() => isDownloading.value)
 
 function handleDocumentPointerDown(event: PointerEvent): void {
   if (!actions.value?.contains(event.target as Node)) isMenuOpen.value = false
@@ -34,13 +33,13 @@ function handleDocumentKeydown(event: KeyboardEvent): void {
 }
 
 function toggleExportMenu(): void {
-  if (isExporting.value) return
+  if (isDownloading.value) return
   errorMessage.value = ''
   isMenuOpen.value = !isMenuOpen.value
 }
 
 async function downloadMarkdown(): Promise<void> {
-  if (!markdownUrl.value || isExporting.value) return
+  if (!markdownUrl.value || isDownloading.value) return
 
   isMenuOpen.value = false
   isDownloading.value = true
@@ -59,7 +58,7 @@ async function downloadMarkdown(): Promise<void> {
 }
 
 async function exportPdf(): Promise<void> {
-  if (isExporting.value) return
+  if (isDownloading.value) return
 
   isMenuOpen.value = false
   errorMessage.value = ''
@@ -79,8 +78,14 @@ async function waitForResumePreview(): Promise<void> {
   const deadline = Date.now() + 3000
 
   while (Date.now() < deadline) {
-    const pageContent = document.querySelector<HTMLElement>('.resume-page-content')
-    if (pageContent?.childNodes.length) return
+    const renderer = document.querySelector<HTMLElement>('.resume-renderer')
+    const pageContent = renderer?.querySelector<HTMLElement>('.resume-page-content')
+    if (renderer?.dataset.resumePaginationState === 'ready' && pageContent?.childNodes.length) {
+      // Let the browser commit the final layout before opening the print
+      // dialog, especially after a margin or line-height change.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      return
+    }
 
     await new Promise<void>((resolve) => window.setTimeout(resolve, 50))
   }
@@ -116,7 +121,7 @@ onBeforeUnmount(() => {
       <button
         class="resume-action-button resume-action-button-primary resume-export-menu-trigger"
         type="button"
-        :disabled="isExporting"
+        :disabled="isDownloading"
         aria-haspopup="true"
         :aria-expanded="isMenuOpen"
         title="选择简历导出格式"

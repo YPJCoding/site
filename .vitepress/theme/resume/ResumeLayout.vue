@@ -88,10 +88,7 @@ onBeforeUnmount(() => {
           @reset="resetResumeSettings"
         />
 
-        <div
-          class="resume-renderer-slot"
-          data-resume-renderer-slot
-        >
+        <div class="resume-renderer-slot">
           <ResumeRenderer
             :source-html="sourceHtml"
             :settings="resumeSettings"

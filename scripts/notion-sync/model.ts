@@ -313,6 +313,10 @@ function normalizeSlug(row: ContentRow): string {
     throw new Error(`Slug must be a single route segment for row "${row.title}": ${slug}`)
   }
 
+  if (slug === '.' || slug === '..' || /[?#\\]/.test(slug)) {
+    throw new Error(`Slug contains reserved route characters for row "${row.title}": ${slug}`)
+  }
+
   return slug
 }
 

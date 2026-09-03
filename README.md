@@ -91,22 +91,21 @@ Slug: personal-resume
 
 ## URL 规则
 
-站点 URL 不使用 Notion 标题，而是使用稳定的结构化路径。
+站点 URL 使用 Notion 数据源中的 `Slug` 字段，不使用标题或 Notion page id。
 
 示例：
 
 ```text
-/a/a/[hash]
-/a/b/[hash]
-/b/a/[hash]
+/frontend/vue
+/frontend/resume
 ```
 
 规则：
 
-- 顶部导航使用 `a`、`b`、`c` 这样的顺序编码。
-- group 使用 `a`、`b`、`c` 这样的顺序编码。
-- article 使用 Notion page id 生成短 hash。
-- 不维护 id 映射表。
+- `Slug` 必须是同级唯一的单段路径，例如 `vue` 或 `personal-resume`。
+- 层级路径由父级页面和当前页面的 `Slug` 拼接生成。
+- 同级页面按 `Order` 升序排列，未填写 `Order` 时按标题排序。
+- `Slug` 不应包含 `/`；同步时会校验缺失或重复的值。
 
 ## 首页维护方式
 
@@ -240,7 +239,7 @@ pnpm run docs:build
 pnpm run docs:preview
 ```
 
-`docs:build` 会自动先执行 `notion:sync`；`docs:dev` 使用当前已有的生成文件，不会自动同步 Notion。
+`docs:build` 和 `docs:dev` 都会先执行 `notion:sync`，确保路由生成文件存在且与 Notion 数据源一致。
 
 ## 生产部署
 
@@ -290,12 +289,13 @@ docs/c/**
 docs/public/resume/**
 ```
 
-仓库中保留需要随站点发布的静态资源；Notion 同步生成的简历 Markdown 导出文件不提交：
+仓库中保留主题代码、同步脚本和随站点发布的字体等静态资源；Notion 同步生成的文档、路由和简历 Markdown 导出文件不提交：
 
 ```text
-docs/public/**（不包含 docs/public/resume/**）
-scripts/sync-notion.ts
-.vitepress/**
+.vitepress/config/**
+.vitepress/theme/**
+scripts/**
+docs/public/fonts/**
 ```
 
 ## License

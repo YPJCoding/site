@@ -13,6 +13,7 @@ const source = ref<HTMLElement>()
 const pages = ref<HTMLElement>()
 const pageScale = ref(1)
 const scaledPagesHeight = ref(0)
+const paginationState = ref<'idle' | 'rendering' | 'ready'>('idle')
 
 let resizeObserver: ResizeObserver | undefined
 let resizeTimer: number | undefined
@@ -23,6 +24,7 @@ let observedWidth = 0
 
 function schedulePagination(delay = 80): void {
   requestVersion += 1
+  paginationState.value = 'rendering'
 
   if (resizeTimer !== undefined) window.clearTimeout(resizeTimer)
 
@@ -41,6 +43,7 @@ async function paginate(version: number): Promise<void> {
   if (!sourceElement || !pagesElement) return
 
   running = true
+  paginationState.value = 'rendering'
 
   try {
     await nextTick()
@@ -63,7 +66,11 @@ async function paginate(version: number): Promise<void> {
     for (const unit of units) {
       if (version !== requestVersion) return
 
-      const clones = unit.map((node) => node.cloneNode(true))
+      const clones = unit.map((node) => {
+        const clone = node.cloneNode(true)
+        restoreCloneIds(clone)
+        return clone
+      })
       currentContent.append(...clones)
 
       if (hasOverflow(currentContent) && currentContent.childNodes.length > clones.length) {
@@ -77,6 +84,7 @@ async function paginate(version: number): Promise<void> {
 
     if (version !== requestVersion) return
     updatePageScale()
+    paginationState.value = 'ready'
   } finally {
     running = false
 
@@ -191,10 +199,19 @@ function updatePageScale(): void {
 
 async function waitForAssets(sourceElement: HTMLElement): Promise<void> {
   if (document.fonts?.ready) {
+    const fontsWereLoading = document.fonts.status === 'loading'
     await Promise.race([
       document.fonts.ready,
       new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
     ])
+
+    // A slow font can finish after the measurement timeout. Re-measure once
+    // it settles so the visible pages never stay on fallback-font metrics.
+    if (fontsWereLoading) {
+      void document.fonts.ready.then(() => {
+        if (mounted) schedulePagination(0)
+      })
+    }
   }
 
   const images = Array.from(sourceElement.querySelectorAll('img'))
@@ -225,12 +242,37 @@ function renderSource(): void {
   if (!source.value || !pages.value) return
 
   source.value.innerHTML = props.sourceHtml
+  prepareSourceIds(source.value)
   source.value.setAttribute('aria-hidden', 'true')
   source.value.setAttribute('inert', '')
   source.value.style.width = ''
   pages.value.replaceChildren()
   updatePageScale()
   schedulePagination()
+}
+
+function prepareSourceIds(sourceElement: HTMLElement): void {
+  sourceElement.querySelectorAll<HTMLElement>('[id]').forEach((element, index) => {
+    const originalId = element.id
+    element.dataset.resumeOriginalId = originalId
+    element.id = `resume-source-${index}-${originalId}`
+  })
+}
+
+function restoreCloneIds(node: Node): void {
+  if (node.nodeType !== Node.ELEMENT_NODE) return
+
+  const element = node as HTMLElement
+  const restore = (candidate: HTMLElement) => {
+    const originalId = candidate.dataset.resumeOriginalId
+    if (!originalId) return
+
+    candidate.id = originalId
+    delete candidate.dataset.resumeOriginalId
+  }
+
+  restore(element)
+  element.querySelectorAll<HTMLElement>('[data-resume-original-id]').forEach(restore)
 }
 
 function handleResize(entries: ResizeObserverEntry[]): void {
@@ -284,6 +326,7 @@ onBeforeUnmount(() => {
       '--resume-theme-color': settings.themeColor,
       '--resume-code-bg': getResumeCodeBackgroundColor(settings.themeColor),
     }"
+    :data-resume-pagination-state="paginationState"
   >
     <div ref="source" class="resume-renderer-source resume-renderer-content" />
     <div

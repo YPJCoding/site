@@ -9,7 +9,8 @@
   },
   "scripts": {
     "notion:sync": "tsx scripts/sync-notion.ts",
-    "docs:dev": "vitepress dev",
+    "typecheck": "tsc --noEmit",
+    "docs:dev": "pnpm notion:sync && vitepress dev",
     "docs:build": "pnpm notion:sync && vitepress build",
     "docs:preview": "vitepress preview"
   },

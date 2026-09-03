@@ -1,17 +1,5 @@
 .resume-renderer {
-  --resume-page-width: 210mm;
-  --resume-page-height: 297mm;
-  --resume-vertical-margin: 14mm;
-  --resume-horizontal-margin: 14mm;
-  --resume-line-height: 22px;
-  --resume-text: #1f2937;
-  --resume-muted: #64748b;
-  --resume-heading: #0f172a;
-  --resume-accent: #2563eb;
   --resume-theme-color: #2563eb;
-  --resume-rule: #dbe3ee;
-  --resume-code-bg: #eef4ff;
-  --resume-font-family: "Resume PingFang SC", "PingFang SC", "苹方-简", "苹方-繁", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --resume-code-font-size: 0.75rem;
   --resume-mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
@@ -269,11 +257,6 @@
 }
 
 @media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
   .resume-renderer {
     width: var(--resume-page-width);
     overflow: visible;

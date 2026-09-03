@@ -9,9 +9,9 @@
 html.resume-mode {
   --resume-page-width: 210mm;
   --resume-page-height: 297mm;
-  --resume-vertical-margin: 14mm;
-  --resume-horizontal-margin: 14mm;
-  --resume-line-height: 22px;
+  --resume-vertical-margin: 10mm;
+  --resume-horizontal-margin: 7mm;
+  --resume-line-height: 28px;
   --resume-text: #1f2937;
   --resume-muted: #64748b;
   --resume-heading: #0f172a;
@@ -296,7 +296,7 @@ html.resume-mode .resume-action-error {
   font-size: 0.8rem;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   html.resume-mode .resume-toolbar {
     flex-direction: row;
     align-items: stretch;
@@ -316,11 +316,6 @@ html.resume-mode .resume-action-error {
 }
 
 @media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
   html.resume-mode .VPNav,
   html.resume-mode .VPSidebar,
   html.resume-mode .VPLocalNav,
@@ -328,9 +323,7 @@ html.resume-mode .resume-action-error {
   html.resume-mode .VPDoc .aside,
   html.resume-mode .VPDocFooter,
   html.resume-mode .VPFooter,
-  html.resume-mode .resume-toolbar,
-  html.resume-mode .resume-settings-toolbar,
-  html.resume-mode .resume-actions {
+  html.resume-mode .resume-toolbar {
     display: none !important;
   }
 
@@ -350,7 +343,4 @@ html.resume-mode .resume-action-error {
     padding: 0;
   }
 
-  html.resume-mode .VPDoc .main {
-    display: none !important;
-  }
 }
