@@ -268,45 +268,6 @@
   text-align: left;
 }
 
-/* The PNG exporter clones the already paginated pages into this off-screen
- * root, then rasterizes the unscaled A4 pages as one continuous image. */
-.resume-png-export {
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  left: -100000px;
-  min-width: var(--resume-page-width);
-  overflow: visible;
-  background: #fff;
-}
-
-.resume-png-export-pages {
-  gap: 0;
-}
-
-.resume-png-export .resume-page {
-  border-radius: 0;
-  box-shadow: none;
-  break-after: auto;
-  page-break-after: auto;
-}
-
-.resume-png-export .resume-page + .resume-page {
-  break-before: auto;
-  page-break-before: auto;
-}
-
-.resume-png-export .resume-page:last-child {
-  height: auto;
-  min-height: 0;
-}
-
-.resume-png-export .resume-page:last-child .resume-page-content {
-  height: auto;
-  min-height: 0;
-  overflow: visible;
-}
-
 @media print {
   @page {
     size: A4;

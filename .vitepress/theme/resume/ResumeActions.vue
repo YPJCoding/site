@@ -7,7 +7,6 @@ const route = useRoute()
 const actions = ref<HTMLElement>()
 const isMenuOpen = ref(false)
 const isDownloading = ref(false)
-const isExportingPng = ref(false)
 const errorMessage = ref('')
 
 const markdownUrl = computed(() => {
@@ -24,8 +23,7 @@ const safeTitle = computed(() => {
 })
 
 const markdownFilename = computed(() => `${safeTitle.value}.md`)
-const pngFilename = computed(() => `${safeTitle.value}.png`)
-const isExporting = computed(() => isDownloading.value || isExportingPng.value)
+const isExporting = computed(() => isDownloading.value)
 
 function handleDocumentPointerDown(event: PointerEvent): void {
   if (!actions.value?.contains(event.target as Node)) isMenuOpen.value = false
@@ -90,143 +88,6 @@ async function waitForResumePreview(): Promise<void> {
   throw new Error('The resume preview has not finished rendering.')
 }
 
-async function exportPng(): Promise<void> {
-  if (isExporting.value) return
-
-  isMenuOpen.value = false
-  isExportingPng.value = true
-  errorMessage.value = ''
-
-  let exportRoot: HTMLElement | undefined
-
-  try {
-    const renderer = document.querySelector<HTMLElement>('.resume-renderer')
-    const pages = renderer?.querySelector<HTMLElement>('.resume-pages')
-    const pageElements = pages ? Array.from(pages.children) as HTMLElement[] : []
-
-    if (!renderer || pageElements.length === 0) {
-      throw new Error('The resume preview has not finished rendering.')
-    }
-
-    const pageWidth = pageElements[0].offsetWidth
-    if (pageWidth <= 0) throw new Error('The resume preview has no measurable width.')
-
-    const { default: html2canvas } = await import('html2canvas')
-    exportRoot = createPngExportRoot(renderer, pageElements, pageWidth)
-    document.body.append(exportRoot)
-    await waitForPngAssets(exportRoot)
-
-    const canvas = await html2canvas(exportRoot, {
-      backgroundColor: '#fff',
-      foreignObjectRendering: true,
-      height: exportRoot.scrollHeight,
-      logging: false,
-      scale: 2,
-      useCORS: true,
-      width: exportRoot.scrollWidth,
-      windowHeight: exportRoot.scrollHeight,
-      windowWidth: exportRoot.scrollWidth,
-    })
-
-    downloadBlob(await canvasToBlob(canvas), pngFilename.value)
-  } catch (error) {
-    console.error('[resume] PNG export failed', error)
-    errorMessage.value = 'PNG 导出失败，请等待预览完成后重试。'
-  } finally {
-    exportRoot?.remove()
-    isExportingPng.value = false
-  }
-}
-
-function createPngExportRoot(
-  renderer: HTMLElement,
-  pageElements: HTMLElement[],
-  pageWidth: number,
-): HTMLElement {
-  const root = document.createElement('div')
-  root.className = 'resume-renderer resume-png-export'
-  root.setAttribute('aria-hidden', 'true')
-  root.style.width = `${pageWidth}px`
-
-  const computedStyle = window.getComputedStyle(renderer)
-  for (const property of [
-    '--resume-page-width',
-    '--resume-page-height',
-    '--resume-vertical-margin',
-    '--resume-horizontal-margin',
-    '--resume-line-height',
-    '--resume-text',
-    '--resume-muted',
-    '--resume-heading',
-    '--resume-accent',
-    '--resume-rule',
-    '--resume-code-bg',
-    '--resume-theme-color',
-    '--resume-code-font-size',
-    '--resume-mono-font',
-  ]) {
-    root.style.setProperty(property, computedStyle.getPropertyValue(property))
-  }
-
-  const exportPages = document.createElement('div')
-  exportPages.className = 'resume-pages resume-png-export-pages'
-  exportPages.style.position = 'static'
-  exportPages.style.display = 'block'
-  exportPages.style.width = `${pageWidth}px`
-  exportPages.style.minWidth = '0'
-  exportPages.style.transform = 'none'
-  exportPages.style.gap = '0'
-  const clonedPages = pageElements.map((page) => page.cloneNode(true) as HTMLElement)
-  exportPages.append(...clonedPages)
-
-  // A long image should end after the final content plus its configured
-  // bottom margin, instead of carrying the unused remainder of the last A4
-  // sheet.
-  const lastPage = clonedPages[clonedPages.length - 1]
-  const lastPageContent = lastPage?.querySelector<HTMLElement>('.resume-page-content')
-  if (lastPage && lastPageContent) {
-    lastPage.style.height = 'auto'
-    lastPage.style.minHeight = '0'
-    lastPageContent.style.height = 'auto'
-    lastPageContent.style.minHeight = '0'
-    lastPageContent.style.overflow = 'visible'
-  }
-
-  root.append(exportPages)
-
-  return root
-}
-
-async function waitForPngAssets(root: HTMLElement): Promise<void> {
-  if (document.fonts?.ready) {
-    await Promise.race([
-      document.fonts.ready,
-      new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
-    ])
-  }
-
-  const images = Array.from(root.querySelectorAll('img'))
-  await Promise.race([
-    Promise.all(images.map((image) => {
-      if (image.complete) return Promise.resolve()
-      return new Promise<void>((resolve) => {
-        image.addEventListener('load', () => resolve(), { once: true })
-        image.addEventListener('error', () => resolve(), { once: true })
-      })
-    })),
-    new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
-  ])
-}
-
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob)
-      else reject(new Error('The browser did not create a PNG blob.'))
-    }, 'image/png')
-  })
-}
-
 function downloadBlob(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -261,7 +122,7 @@ onBeforeUnmount(() => {
         title="选择简历导出格式"
         @click="toggleExportMenu"
       >
-        {{ isExportingPng ? '生成 PNG 中…' : isDownloading ? '导出中…' : '导出' }}
+        {{ isDownloading ? '导出中…' : '导出' }}
         <span class="resume-export-menu-arrow" aria-hidden="true" />
       </button>
 
@@ -276,14 +137,6 @@ onBeforeUnmount(() => {
         </button>
         <button class="resume-export-option" type="button" @click="exportPdf">
           导出 PDF
-        </button>
-        <button
-          class="resume-export-option"
-          type="button"
-          :disabled="isExportingPng"
-          @click="exportPng"
-        >
-          导出 PNG
         </button>
       </div>
     </div>
