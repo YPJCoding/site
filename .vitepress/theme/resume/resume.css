@@ -9,9 +9,9 @@ html.resume-mode {
   --resume-text: #1f2937;
   --resume-muted: #64748b;
   --resume-heading: #0f172a;
-  --resume-accent: #2563eb;
+  --resume-accent: #e75e23;
   --resume-rule: var(--vp-c-divider, #dbe3ee);
-  --resume-code-bg: #eef4ff;
+  --resume-code-bg: rgba(231, 94, 35, 0.12);
   --resume-font-family: "PingFangSC-Regular", sans-serif;
   font-synthesis: none;
 }
@@ -277,8 +277,14 @@ html.resume-mode .resume-action-button-primary {
 }
 
 html.resume-mode .resume-action-button-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--resume-accent) 86%, black);
   color: #fff;
-  background: #1d4ed8;
+  background: color-mix(in srgb, var(--resume-accent) 86%, black);
+}
+
+html.resume-mode .resume-action-button-primary:active:not(:disabled) {
+  border-color: color-mix(in srgb, var(--resume-accent) 72%, black);
+  background: color-mix(in srgb, var(--resume-accent) 72%, black);
 }
 
 html.resume-mode .resume-action-error {

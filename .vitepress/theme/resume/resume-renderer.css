@@ -1,5 +1,5 @@
 .resume-renderer {
-  --resume-theme-color: #2563eb;
+  --resume-theme-color: #e75e23;
   --resume-code-font-size: 0.75rem;
   --resume-mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
@@ -64,6 +64,22 @@
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 12px 32px rgb(15 23 42 / 8%);
+}
+
+/* Only the cover page gets the theme-derived background. */
+.resume-page:first-child {
+  background: linear-gradient(#ffeff2, #faf7ed, #fff, #fff);
+}
+
+@supports (color: hsl(from red h s l)) {
+  .resume-page:first-child {
+    background: linear-gradient(
+      hsl(from var(--resume-theme-color) calc(h - 30) 100% 96.8%),
+      hsl(from var(--resume-theme-color) calc(h + 28) 56% 95.5%),
+      #fff,
+      #fff
+    );
+  }
 }
 
 .resume-page + .resume-page {

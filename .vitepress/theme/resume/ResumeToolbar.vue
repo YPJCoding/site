@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResumeActions from './ResumeActions.vue'
 import ResumeSettingsToolbar from './ResumeSettingsToolbar.vue'
-import type { ResumeSettings } from './resume-settings'
+import { getResumeCodeBackgroundColor, type ResumeSettings } from './resume-settings'
 
 defineProps<{
   settings: ResumeSettings
@@ -17,7 +17,15 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="resume-toolbar" role="toolbar" aria-label="简历工具栏">
+  <div
+    class="resume-toolbar"
+    role="toolbar"
+    aria-label="简历工具栏"
+    :style="{
+      '--resume-accent': settings.themeColor,
+      '--resume-code-bg': getResumeCodeBackgroundColor(settings.themeColor),
+    }"
+  >
     <ResumeSettingsToolbar
       :vertical-margin="settings.vertical"
       :horizontal-margin="settings.horizontal"

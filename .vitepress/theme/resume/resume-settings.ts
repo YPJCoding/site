@@ -9,7 +9,7 @@ export const DEFAULT_RESUME_SETTINGS: ResumeSettings = {
   vertical: 10,
   horizontal: 7,
   lineHeight: 28,
-  themeColor: '#2563eb',
+  themeColor: '#e75e23',
 }
 
 const VERTICAL_MARGIN_MIN = 5
