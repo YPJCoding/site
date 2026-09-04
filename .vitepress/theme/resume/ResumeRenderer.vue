@@ -202,7 +202,7 @@ async function waitForAssets(sourceElement: HTMLElement): Promise<void> {
     const fontsWereLoading = document.fonts.status === 'loading'
     await Promise.race([
       document.fonts.ready,
-      new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
+      // new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
     ])
 
     // A slow font can finish after the measurement timeout. Re-measure once
@@ -231,7 +231,7 @@ async function waitForAssets(sourceElement: HTMLElement): Promise<void> {
         image.addEventListener('error', settle, { once: true })
         if (image.complete) settle()
       }))),
-      new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
+      // new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
     ])
   }
 

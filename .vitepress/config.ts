@@ -18,8 +18,7 @@ export default defineConfig({
   description: SITE_DESCRIPTION,
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-    ['link', { rel: 'shortcut icon', href: '/favicon.ico' }],
+    ['link', { rel: 'shortcut icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'robots', content: 'index,follow' }],
 
     // google seo
