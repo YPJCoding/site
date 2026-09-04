@@ -4,68 +4,22 @@ html {
 }
 
 :root {
-  --site-theme-color: #e75e23;
-  --vp-c-brand-1: var(--site-theme-color);
-  --vp-c-brand-2: color-mix(in srgb, var(--site-theme-color) 86%, black);
-  --vp-c-brand-3: color-mix(in srgb, var(--site-theme-color) 72%, black);
-  --vp-c-brand-soft: color-mix(in srgb, var(--site-theme-color) 14%, transparent);
-
-  /* Hero 图背景光晕跟随主题色 */
+  /*Hero 图加背景光晕*/
   --vp-home-hero-image-background-image: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--site-theme-color) 24%, white) 10%,
-    color-mix(in srgb, var(--site-theme-color) 54%, white) 45%,
-    color-mix(in srgb, var(--site-theme-color) 30%, white) 100%
+    #bfdbfe 10%,
+    #93c5fd 45%,
+    #c4b5fd 100%
   );
   --vp-home-hero-image-filter: blur(64px);
-}
-
-/* 不支持 relative color 的浏览器使用默认主题色对应的静态渐变。 */
-.VPContent.is-home {
-  min-height: calc(100vh - var(--vp-nav-height));
-  background: linear-gradient(#ffeff2, #faf7ed, white, white);
-}
-
-.VPHome {
-  background: transparent;
-}
-
-/*
- * 首页渐变算法：围绕主题色 Hue 向两侧各偏移约 30°，再提高亮度得到柔和的邻近色。
- * #e75e23 -> #ffeff2 / #faf7ed
- */
-@supports (color: hsl(from red h s l)) {
-  .VPContent.is-home {
-    background: linear-gradient(
-      hsl(from var(--site-theme-color) calc(h - 30) 100% 96.8%),
-      hsl(from var(--site-theme-color) calc(h + 28) 56% 95.5%),
-      white,
-      white
-    );
-  }
 }
 
 .dark {
   --vp-home-hero-image-background-image: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--site-theme-color) 64%, transparent) 10%,
-    color-mix(in srgb, var(--site-theme-color) 52%, transparent) 45%,
-    color-mix(in srgb, var(--site-theme-color) 40%, transparent) 100%
+    rgb(96 165 250 / 0.62) 10%,
+    rgb(59 130 246 / 0.56) 45%,
+    rgb(139 92 246 / 0.52) 100%
   );
   --vp-home-hero-image-filter: blur(82px);
-}
-
-.dark .VPContent.is-home {
-  background: var(--vp-c-bg);
-}
-
-@supports (color: hsl(from red h s l)) {
-  .dark .VPContent.is-home {
-    background: linear-gradient(
-      hsl(from var(--site-theme-color) calc(h - 30) 38% 12%),
-      hsl(from var(--site-theme-color) calc(h + 28) 32% 9.5%),
-      var(--vp-c-bg),
-      var(--vp-c-bg)
-    );
-  }
 }
