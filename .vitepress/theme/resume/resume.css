@@ -1,9 +1,6 @@
 @font-face {
-  font-family: "Resume PingFang SC";
-  src: url("/fonts/PingFangSC-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+  font-family: "PingFangSC";
+  src: url("/fonts/PingFangSC-Regular.woff2") format("truetype");
 }
 
 html.resume-mode {
@@ -18,7 +15,7 @@ html.resume-mode {
   --resume-accent: #2563eb;
   --resume-rule: var(--vp-c-divider, #dbe3ee);
   --resume-code-bg: #eef4ff;
-  --resume-font-family: "Resume PingFang SC", "PingFang SC", "苹方-简", "苹方-繁", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --resume-font-family: PingFangSC, sans-serif, serif;
 }
 
 html.resume-mode,
