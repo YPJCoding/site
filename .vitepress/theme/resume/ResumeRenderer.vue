@@ -198,22 +198,6 @@ function updatePageScale(): void {
 }
 
 async function waitForAssets(sourceElement: HTMLElement): Promise<void> {
-  if (document.fonts?.ready) {
-    const fontsWereLoading = document.fonts.status === 'loading'
-    await Promise.race([
-      document.fonts.ready,
-      new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
-    ])
-
-    // A slow font can finish after the measurement timeout. Re-measure once
-    // it settles so the visible pages never stay on fallback-font metrics.
-    if (fontsWereLoading) {
-      void document.fonts.ready.then(() => {
-        if (mounted) schedulePagination(0)
-      })
-    }
-  }
-
   const images = Array.from(sourceElement.querySelectorAll('img'))
   const pendingImages = images.filter((image) => !image.complete)
 
@@ -275,6 +259,14 @@ function restoreCloneIds(node: Node): void {
   element.querySelectorAll<HTMLElement>('[data-resume-original-id]').forEach(restore)
 }
 
+function handleFontsLoaded(): void {
+  if (mounted) schedulePagination(0)
+}
+
+function handleForcedPagination(): void {
+  if (mounted) schedulePagination(0)
+}
+
 function handleResize(entries: ResizeObserverEntry[]): void {
   const width = entries[0]?.contentRect.width ?? 0
   if (width <= 0 || Math.abs(width - observedWidth) < 0.5) return
@@ -296,6 +288,8 @@ watch(
 
 onMounted(() => {
   mounted = true
+  document.fonts?.addEventListener('loadingdone', handleFontsLoaded)
+  window.addEventListener('resume:repaginate', handleForcedPagination)
   renderSource()
 
   if (renderer.value) {
@@ -308,6 +302,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   mounted = false
   requestVersion += 1
+  document.fonts?.removeEventListener('loadingdone', handleFontsLoaded)
+  window.removeEventListener('resume:repaginate', handleForcedPagination)
   resizeObserver?.disconnect()
 
   if (resizeTimer !== undefined) window.clearTimeout(resizeTimer)

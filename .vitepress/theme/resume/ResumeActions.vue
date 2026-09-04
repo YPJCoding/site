@@ -75,6 +75,10 @@ async function exportPdf(): Promise<void> {
 }
 
 async function waitForResumePreview(): Promise<void> {
+  // Preview renders immediately, but PDF export must use the final webfont metrics.
+  if (document.fonts?.ready) await document.fonts.ready
+  window.dispatchEvent(new Event('resume:repaginate'))
+
   const deadline = Date.now() + 3000
 
   while (Date.now() < deadline) {
