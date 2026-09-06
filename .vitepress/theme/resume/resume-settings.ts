@@ -7,8 +7,8 @@ export interface ResumeSettings {
 
 export const DEFAULT_RESUME_SETTINGS: ResumeSettings = {
   vertical: 10,
-  horizontal: 7,
-  lineHeight: 28,
+  horizontal: 8,
+  lineHeight: 30,
   themeColor: '#e75e23',
 }
 
@@ -80,18 +80,10 @@ function normalizeThemeColor(value: string | undefined, fallback: string): strin
 }
 
 export function getResumeCodeBackgroundColor(themeColor: string): string {
-  return getResumeColorWithOpacity(themeColor, 0.12)
-}
-
-export function getResumeCodeBorderColor(themeColor: string): string {
-  return getResumeColorWithOpacity(themeColor, 0.28)
-}
-
-function getResumeColorWithOpacity(themeColor: string, opacity: number): string {
   const normalized = normalizeThemeColor(themeColor, DEFAULT_RESUME_SETTINGS.themeColor)
   const red = Number.parseInt(normalized.slice(1, 3), 16)
   const green = Number.parseInt(normalized.slice(3, 5), 16)
   const blue = Number.parseInt(normalized.slice(5, 7), 16)
 
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
+  return `rgba(${red}, ${green}, ${blue}, 0.12)`
 }

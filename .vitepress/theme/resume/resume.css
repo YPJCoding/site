@@ -4,15 +4,14 @@ html.resume-mode {
   --resume-page-width: 210mm;
   --resume-page-height: 297mm;
   --resume-vertical-margin: 10mm;
-  --resume-horizontal-margin: 7mm;
-  --resume-line-height: 28px;
+  --resume-horizontal-margin: 8mm;
+  --resume-line-height: 30px;
   --resume-text: #1f2937;
   --resume-muted: #64748b;
   --resume-heading: #0f172a;
   --resume-accent: #e75e23;
   --resume-rule: var(--vp-c-divider, #dbe3ee);
   --resume-code-bg: rgba(231, 94, 35, 0.12);
-  --resume-code-border: rgba(231, 94, 35, 0.28);
   --resume-font-family: "PingFangSC-Regular", sans-serif;
   font-synthesis: none;
 }

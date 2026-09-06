@@ -177,8 +177,8 @@
 }
 
 .resume-renderer-content :not(pre) > code {
-  padding: 0.08em 0.42em;
-  border: 1px solid var(--resume-code-border);
+  padding: calc(0.08em + 1px) calc(0.42em + 1px);
+  border: 0;
   border-radius: 999px;
   color: var(--resume-theme-color);
   background: var(--resume-code-bg);
