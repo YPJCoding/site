@@ -12,6 +12,7 @@ html.resume-mode {
   --resume-accent: #e75e23;
   --resume-rule: var(--vp-c-divider, #dbe3ee);
   --resume-code-bg: rgba(231, 94, 35, 0.12);
+  --resume-code-border: rgba(231, 94, 35, 0.28);
   --resume-font-family: "PingFangSC-Regular", sans-serif;
   font-synthesis: none;
 }

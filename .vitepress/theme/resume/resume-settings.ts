@@ -80,10 +80,18 @@ function normalizeThemeColor(value: string | undefined, fallback: string): strin
 }
 
 export function getResumeCodeBackgroundColor(themeColor: string): string {
+  return getResumeColorWithOpacity(themeColor, 0.12)
+}
+
+export function getResumeCodeBorderColor(themeColor: string): string {
+  return getResumeColorWithOpacity(themeColor, 0.28)
+}
+
+function getResumeColorWithOpacity(themeColor: string, opacity: number): string {
   const normalized = normalizeThemeColor(themeColor, DEFAULT_RESUME_SETTINGS.themeColor)
   const red = Number.parseInt(normalized.slice(1, 3), 16)
   const green = Number.parseInt(normalized.slice(3, 5), 16)
   const blue = Number.parseInt(normalized.slice(5, 7), 16)
 
-  return `rgba(${red}, ${green}, ${blue}, 0.12)`
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
 }

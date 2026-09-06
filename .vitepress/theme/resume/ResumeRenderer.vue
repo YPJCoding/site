@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ResumeSettings } from './resume-settings'
-import { getResumeCodeBackgroundColor } from './resume-settings'
+import { getResumeCodeBackgroundColor, getResumeCodeBorderColor } from './resume-settings'
 
 const props = defineProps<{
   sourceHtml: string
@@ -321,6 +321,7 @@ onBeforeUnmount(() => {
       '--resume-line-height': `${settings.lineHeight}px`,
       '--resume-theme-color': settings.themeColor,
       '--resume-code-bg': getResumeCodeBackgroundColor(settings.themeColor),
+      '--resume-code-border': getResumeCodeBorderColor(settings.themeColor),
     }"
     :data-resume-pagination-state="paginationState"
   >
